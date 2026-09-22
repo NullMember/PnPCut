@@ -4,123 +4,150 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sheet Assembler</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<div class="app editor-app">
+<div class="container">
 
   <header>
-    <h1>Sheet Assembler <a class="nav-link" href="index.html">&larr; Grid tool</a> <a class="nav-link" href="editor.html">&larr; Card editor</a></h1>
+    <h1>Sheet Assembler</h1>
     <p class="subtitle">Combine per-card Score-Fold/Emboss designs from the card editor into one full-sheet SVG, aligned to the grid tool's cell positions. Cut stays the uniform card outline.</p>
+    <nav class="tool-nav">
+      <a class="nav-link" href="index.html">&larr; Grid tool</a>
+      <a class="nav-link" href="editor.html">&larr; Card editor</a>
+      <a class="nav-link current" href="sheet.html">Sheet assembler</a>
+    </nav>
   </header>
 
-  <main class="editor-main">
+  <div class="content with-gallery">
+    <div class="sidebar">
 
-    <div class="panel toolbar-panel">
-      <fieldset>
-        <legend>Card</legend>
-        <label>Width (mm)
+      <div class="panel">
+        <div class="panel-title">Card</div>
+        <div class="control-group">
+          <label for="cardW">Width (mm)</label>
           <input type="number" id="cardW" value="63" min="1" step="0.1" required>
-        </label>
-        <label>Height (mm)
+        </div>
+        <div class="control-group">
+          <label for="cardH">Height (mm)</label>
           <input type="number" id="cardH" value="88" min="1" step="0.1" required>
-        </label>
-        <label>Corner radius (mm)
+        </div>
+        <div class="control-group">
+          <label for="radius">Corner radius (mm)</label>
           <input type="number" id="radius" value="3" min="0" step="0.1" required>
-        </label>
-      </fieldset>
+        </div>
+      </div>
 
-      <fieldset>
-        <legend>Bleed &amp; spacing</legend>
-        <label>Bleed per card (mm)
+      <div class="panel">
+        <div class="panel-title">Bleed &amp; Spacing</div>
+        <div class="control-group">
+          <label for="bleed">Bleed per card (mm)</label>
           <input type="number" id="bleed" value="2" min="0" step="0.1" required>
-        </label>
-        <label>Gap between cards (mm)
+        </div>
+        <div class="control-group">
+          <label for="gap">Gap between cards (mm)</label>
           <input type="number" id="gap" value="4" min="0" step="0.1" required>
-        </label>
-        <label>Gap from guide edge to nearest card (mm)
+        </div>
+        <div class="control-group">
+          <label for="edgeMargin">Gap from guide edge to nearest card (mm)</label>
           <input type="number" id="edgeMargin" value="2" min="0" step="0.1" required>
-        </label>
-      </fieldset>
+        </div>
+      </div>
 
-      <fieldset>
-        <legend>Paper</legend>
-        <label>Preset
+      <div class="panel">
+        <div class="panel-title">Paper</div>
+        <div class="control-group">
+          <label for="paperPreset">Preset</label>
           <select id="paperPreset">
             <option value="a4">A4 (210 &times; 297 mm)</option>
             <option value="letter">US Letter (215.9 &times; 279.4 mm)</option>
             <option value="custom">Custom</option>
           </select>
-        </label>
-        <label>Width (mm)
-          <input type="number" id="paperW" value="210" min="1" step="0.1" required>
-        </label>
-        <label>Height (mm)
-          <input type="number" id="paperH" value="297" min="1" step="0.1" required>
-        </label>
-        <label class="checkbox">
-          <input type="checkbox" id="landscape">
-          Landscape
-        </label>
-      </fieldset>
+        </div>
+        <div class="row">
+          <div class="control-group">
+            <label for="paperW">Width (mm)</label>
+            <input type="number" id="paperW" value="210" min="1" step="0.1" required>
+          </div>
+          <div class="control-group">
+            <label for="paperH">Height (mm)</label>
+            <input type="number" id="paperH" value="297" min="1" step="0.1" required>
+          </div>
+        </div>
+        <div class="control-group">
+          <label class="inline"><input type="checkbox" id="landscape"> Landscape</label>
+        </div>
+      </div>
 
-      <fieldset>
-        <legend>Cricut machine</legend>
-        <label>Mat dead margin (mm)
+      <div class="panel">
+        <div class="panel-title">Cricut Machine</div>
+        <div class="control-group">
+          <label for="machineMargin">Mat dead margin (mm)</label>
           <input type="number" id="machineMargin" value="6.35" min="0" step="0.1" required>
-        </label>
-      </fieldset>
+        </div>
+      </div>
 
-      <fieldset>
-        <legend>Grid</legend>
-        <label class="checkbox">
-          <input type="checkbox" id="autoFit" checked>
-          Auto-fit maximum grid
-        </label>
-        <label>Columns
-          <input type="number" id="cols" value="1" min="1" step="1" required disabled>
-        </label>
-        <label>Rows
-          <input type="number" id="rowsInput" value="1" min="1" step="1" required disabled>
-        </label>
-      </fieldset>
+      <div class="panel">
+        <div class="panel-title">Grid</div>
+        <div class="control-group">
+          <label class="inline"><input type="checkbox" id="autoFit" checked> Auto-fit maximum grid</label>
+        </div>
+        <div class="row">
+          <div class="control-group">
+            <label for="cols">Columns</label>
+            <input type="number" id="cols" value="1" min="1" step="1" required disabled>
+          </div>
+          <div class="control-group">
+            <label for="rowsInput">Rows</label>
+            <input type="number" id="rowsInput" value="1" min="1" step="1" required disabled>
+          </div>
+        </div>
+      </div>
 
-      <div id="warning" class="warning" hidden></div>
+      <div id="warning" class="status error" hidden></div>
     </div>
 
-    <div class="panel canvas-panel">
+    <div class="main">
       <div class="svg-wrap" id="canvasWrap"></div>
     </div>
 
-    <div class="panel properties-panel sheet-side-panel">
-      <h2>Card projects</h2>
-      <label>Upload project .json file(s)
-        <input type="file" id="projectInput" accept="application/json" multiple>
-      </label>
-      <div id="projectList" class="project-list"></div>
-
-      <h2>Cell assignment</h2>
-      <div id="cellAssignment" class="cell-assignment"></div>
-      <div class="fill-all-row" id="fillAllRow" hidden>
-        <select id="fillAllSelect"></select>
-        <button type="button" id="fillAllBtn" class="secondary-btn">Fill empty cells</button>
+    <div class="gallery-sidebar">
+      <div class="panel">
+        <div class="panel-title">Card Projects <span class="help" tabindex="0" data-tip="Upload the .json project files you saved from the card editor, then assign one to each grid cell below.">?</span></div>
+        <div class="control-group">
+          <label for="projectInput">Upload project .json file(s)</label>
+          <input type="file" id="projectInput" accept="application/json" multiple>
+        </div>
+        <div id="projectList" class="project-list"></div>
       </div>
 
-      <h2>Export</h2>
-      <label class="checkbox">
-        <input type="checkbox" id="mirrorSheet">
-        Mirror whole sheet (for back-side pass)
-      </label>
-      <button type="button" id="exportAllBtn">Export all layers</button>
-      <button type="button" id="exportCutBtn" class="secondary-btn">Export Cut only</button>
-      <button type="button" id="exportScoreBtn" class="secondary-btn">Export Score/Fold only</button>
-      <button type="button" id="exportEmbossBtn" class="secondary-btn">Export Emboss only</button>
+      <div class="panel">
+        <div class="panel-title">Cell Assignment</div>
+        <div id="cellAssignment" class="cell-assignment"></div>
+        <div class="fill-all-row" id="fillAllRow" hidden>
+          <select id="fillAllSelect"></select>
+          <button type="button" id="fillAllBtn" class="btn-secondary">Fill empty cells</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Export</div>
+        <div class="control-group">
+          <label class="inline"><input type="checkbox" id="mirrorSheet"> Mirror whole sheet (for back-side pass)</label>
+        </div>
+        <div class="button-group">
+          <button type="button" id="exportAllBtn" class="btn-primary">Export all layers</button>
+          <button type="button" id="exportCutBtn" class="btn-secondary">Export Cut only</button>
+          <button type="button" id="exportScoreBtn" class="btn-secondary">Export Score/Fold only</button>
+          <button type="button" id="exportEmbossBtn" class="btn-secondary">Export Emboss only</button>
+        </div>
+      </div>
     </div>
 
-  </main>
+  </div>
 
 </div>
-<script src="grid-math.js"></script>
-<script src="sheet.js"></script>
+<script src="js/grid-math.js"></script>
+<script src="js/sheet.js"></script>
 </body>
 </html>
