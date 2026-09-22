@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Card Line Art Editor</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app editor-app">
+
+  <header>
+    <h1>Card Line Art Editor <a class="nav-link" href="index.html">&larr; Grid tool</a> <a class="nav-link" href="sheet.html">Sheet assembler &rarr;</a></h1>
+    <p class="subtitle">Draw cut / score-fold / emboss line art on top of a card image and export precise per-layer SVGs.</p>
+  </header>
+
+  <main class="editor-main">
+
+    <div class="panel toolbar-panel">
+      <fieldset>
+        <legend>Card</legend>
+        <label>Width (mm)
+          <input type="number" id="cardW" value="88" min="1" step="0.1" required>
+        </label>
+        <label>Height (mm)
+          <input type="number" id="cardH" value="63" min="1" step="0.1" required>
+        </label>
+        <label>Reference image
+          <input type="file" id="imageInput" accept="image/*">
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="imageVisible" checked>
+          Show reference image
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Tool</legend>
+        <div class="tool-buttons" id="toolButtons">
+          <button type="button" data-tool="select" class="tool-btn active" title="Select / Move">Select</button>
+          <button type="button" data-tool="line" class="tool-btn" title="Line">Line</button>
+          <button type="button" data-tool="rect" class="tool-btn" title="Rectangle">Rect</button>
+          <button type="button" data-tool="ellipse" class="tool-btn" title="Ellipse">Ellipse</button>
+          <button type="button" data-tool="polygon" class="tool-btn" title="Polygon / lasso">Polygon</button>
+        </div>
+        <small>Line/Rect/Ellipse: click-drag. Polygon: click each point, then click back on the first point to close. Shift snaps angles.</small>
+      </fieldset>
+
+      <fieldset>
+        <legend>Active layer</legend>
+        <div class="layer-buttons" id="layerButtons">
+          <button type="button" data-layer="cut" class="layer-btn active">Cut</button>
+          <button type="button" data-layer="score" class="layer-btn">Score/Fold</button>
+          <button type="button" data-layer="emboss" class="layer-btn">Emboss</button>
+        </div>
+        <div class="layer-visibility" id="layerVisibility">
+          <label class="checkbox"><input type="checkbox" data-vis="cut" checked> <span class="swatch swatch-cut"></span> Cut</label>
+          <label class="checkbox"><input type="checkbox" data-vis="score" checked> <span class="swatch swatch-score"></span> Score/Fold</label>
+          <label class="checkbox"><input type="checkbox" data-vis="emboss" checked> <span class="swatch swatch-emboss"></span> Emboss</label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Project</legend>
+        <button type="button" id="saveProjectBtn" class="secondary-btn">Save project (.json)</button>
+        <label>Load project
+          <input type="file" id="loadProjectInput" accept="application/json">
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Export SVG</legend>
+        <label class="checkbox">
+          <input type="checkbox" id="mirrorExport">
+          Mirror horizontally (for back-side score/emboss)
+        </label>
+        <button type="button" id="exportAllBtn">Export all layers</button>
+        <button type="button" id="exportCutBtn" class="secondary-btn">Export Cut only</button>
+        <button type="button" id="exportScoreBtn" class="secondary-btn">Export Score/Fold only</button>
+        <button type="button" id="exportEmbossBtn" class="secondary-btn">Export Emboss only</button>
+      </fieldset>
+    </div>
+
+    <div class="panel canvas-panel">
+      <div class="canvas-wrap" id="canvasWrap"></div>
+    </div>
+
+    <div class="panel properties-panel">
+      <h2>Properties</h2>
+      <div id="propsEmpty" class="props-empty">No shape selected.</div>
+      <div id="propsForm" class="props-form" hidden>
+        <label>Layer
+          <select id="propLayer">
+            <option value="cut">Cut</option>
+            <option value="score">Score/Fold</option>
+            <option value="emboss">Emboss</option>
+          </select>
+        </label>
+        <label id="propXWrap">X (mm)
+          <input type="number" id="propX" step="0.1">
+        </label>
+        <label id="propYWrap">Y (mm)
+          <input type="number" id="propY" step="0.1">
+        </label>
+        <label id="propWWrap">Width (mm)
+          <input type="number" id="propW" step="0.1">
+        </label>
+        <label id="propHWrap">Height (mm)
+          <input type="number" id="propH" step="0.1">
+        </label>
+        <label id="propRadiusWrap" hidden>Corner radius (mm)
+          <input type="number" id="propRadius" step="0.1" min="0">
+        </label>
+        <label id="propRotWrap">Rotation (deg)
+          <input type="number" id="propRot" step="1">
+        </label>
+        <button type="button" id="deleteShapeBtn" class="secondary-btn danger">Delete shape</button>
+      </div>
+
+      <div class="history-buttons">
+        <button type="button" id="undoBtn" title="Ctrl/Cmd+Z">Undo</button>
+        <button type="button" id="redoBtn" title="Ctrl/Cmd+Shift+Z">Redo</button>
+      </div>
+
+      <p class="legend-note">Delete = remove selected shape &middot; Arrow keys = nudge 0.1mm (1mm with shift) &middot; Reference image is never exported.</p>
+    </div>
+
+  </main>
+
+</div>
+<script src="editor.js"></script>
+</body>
+</html>

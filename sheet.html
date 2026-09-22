@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sheet Assembler</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app editor-app">
+
+  <header>
+    <h1>Sheet Assembler <a class="nav-link" href="index.html">&larr; Grid tool</a> <a class="nav-link" href="editor.html">&larr; Card editor</a></h1>
+    <p class="subtitle">Combine per-card Score-Fold/Emboss designs from the card editor into one full-sheet SVG, aligned to the grid tool's cell positions. Cut stays the uniform card outline.</p>
+  </header>
+
+  <main class="editor-main">
+
+    <div class="panel toolbar-panel">
+      <fieldset>
+        <legend>Card</legend>
+        <label>Width (mm)
+          <input type="number" id="cardW" value="63" min="1" step="0.1" required>
+        </label>
+        <label>Height (mm)
+          <input type="number" id="cardH" value="88" min="1" step="0.1" required>
+        </label>
+        <label>Corner radius (mm)
+          <input type="number" id="radius" value="3" min="0" step="0.1" required>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Bleed &amp; spacing</legend>
+        <label>Bleed per card (mm)
+          <input type="number" id="bleed" value="2" min="0" step="0.1" required>
+        </label>
+        <label>Gap between cards (mm)
+          <input type="number" id="gap" value="4" min="0" step="0.1" required>
+        </label>
+        <label>Gap from guide edge to nearest card (mm)
+          <input type="number" id="edgeMargin" value="2" min="0" step="0.1" required>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Paper</legend>
+        <label>Preset
+          <select id="paperPreset">
+            <option value="a4">A4 (210 &times; 297 mm)</option>
+            <option value="letter">US Letter (215.9 &times; 279.4 mm)</option>
+            <option value="custom">Custom</option>
+          </select>
+        </label>
+        <label>Width (mm)
+          <input type="number" id="paperW" value="210" min="1" step="0.1" required>
+        </label>
+        <label>Height (mm)
+          <input type="number" id="paperH" value="297" min="1" step="0.1" required>
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="landscape">
+          Landscape
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Cricut machine</legend>
+        <label>Mat dead margin (mm)
+          <input type="number" id="machineMargin" value="6.35" min="0" step="0.1" required>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Grid</legend>
+        <label class="checkbox">
+          <input type="checkbox" id="autoFit" checked>
+          Auto-fit maximum grid
+        </label>
+        <label>Columns
+          <input type="number" id="cols" value="1" min="1" step="1" required disabled>
+        </label>
+        <label>Rows
+          <input type="number" id="rowsInput" value="1" min="1" step="1" required disabled>
+        </label>
+      </fieldset>
+
+      <div id="warning" class="warning" hidden></div>
+    </div>
+
+    <div class="panel canvas-panel">
+      <div class="svg-wrap" id="canvasWrap"></div>
+    </div>
+
+    <div class="panel properties-panel sheet-side-panel">
+      <h2>Card projects</h2>
+      <label>Upload project .json file(s)
+        <input type="file" id="projectInput" accept="application/json" multiple>
+      </label>
+      <div id="projectList" class="project-list"></div>
+
+      <h2>Cell assignment</h2>
+      <div id="cellAssignment" class="cell-assignment"></div>
+      <div class="fill-all-row" id="fillAllRow" hidden>
+        <select id="fillAllSelect"></select>
+        <button type="button" id="fillAllBtn" class="secondary-btn">Fill empty cells</button>
+      </div>
+
+      <h2>Export</h2>
+      <label class="checkbox">
+        <input type="checkbox" id="mirrorSheet">
+        Mirror whole sheet (for back-side pass)
+      </label>
+      <button type="button" id="exportAllBtn">Export all layers</button>
+      <button type="button" id="exportCutBtn" class="secondary-btn">Export Cut only</button>
+      <button type="button" id="exportScoreBtn" class="secondary-btn">Export Score/Fold only</button>
+      <button type="button" id="exportEmbossBtn" class="secondary-btn">Export Emboss only</button>
+    </div>
+
+  </main>
+
+</div>
+<script src="grid-math.js"></script>
+<script src="sheet.js"></script>
+</body>
+</html>

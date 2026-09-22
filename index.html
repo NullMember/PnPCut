@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Print &amp; Cut Card Grid Generator</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <h1>Print &amp; Cut Card Grid Generator <a class="nav-link" href="editor.html">Card editor &rarr;</a> <a class="nav-link" href="sheet.html">Sheet assembler &rarr;</a></h1>
+    <p class="subtitle">Generates an SVG of your card cutting grid, pre-aligned for Cricut Design Space's 0.5&Prime; mat margin.</p>
+  </header>
+
+  <main>
+    <form id="form" class="panel">
+
+      <fieldset>
+        <legend>Card</legend>
+        <label>Width (mm)
+          <input type="number" id="cardW" value="63" min="1" step="0.1" required>
+        </label>
+        <label>Height (mm)
+          <input type="number" id="cardH" value="88" min="1" step="0.1" required>
+        </label>
+        <label>Corner radius (mm)
+          <input type="number" id="radius" value="3" min="0" step="0.1" required>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Bleed &amp; spacing</legend>
+        <label>Bleed per card (mm)
+          <input type="number" id="bleed" value="2" min="0" step="0.1" required>
+        </label>
+        <label>Gap between cards (mm)
+          <input type="number" id="gap" value="4" min="0" step="0.1" required>
+          <small>default = 2 &times; bleed</small>
+        </label>
+        <label>Gap from guide edge to nearest card (mm)
+          <input type="number" id="edgeMargin" value="2" min="0" step="0.1" required>
+          <small>default = 1 &times; bleed</small>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Paper</legend>
+        <label>Preset
+          <select id="paperPreset">
+            <option value="a4">A4 (210 &times; 297 mm)</option>
+            <option value="letter">US Letter (215.9 &times; 279.4 mm)</option>
+            <option value="custom">Custom</option>
+          </select>
+        </label>
+        <label>Width (mm)
+          <input type="number" id="paperW" value="210" min="1" step="0.1" required>
+        </label>
+        <label>Height (mm)
+          <input type="number" id="paperH" value="297" min="1" step="0.1" required>
+        </label>
+        <label class="checkbox">
+          <input type="checkbox" id="landscape">
+          Landscape
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Cricut machine</legend>
+        <label>Mat dead margin (mm)
+          <input type="number" id="machineMargin" value="6.35" min="0" step="0.1" required>
+          <small>default = 0.25&Prime;</small>
+        </label>
+      </fieldset>
+
+      <fieldset>
+        <legend>Grid</legend>
+        <label class="checkbox">
+          <input type="checkbox" id="autoFit" checked>
+          Auto-fit maximum grid
+        </label>
+        <label>Columns
+          <input type="number" id="cols" value="1" min="1" step="1" required disabled>
+        </label>
+        <label>Rows
+          <input type="number" id="rowsInput" value="1" min="1" step="1" required disabled>
+        </label>
+      </fieldset>
+
+      <div id="warning" class="warning" hidden></div>
+
+      <button type="button" id="downloadBtn">Download SVG</button>
+    </form>
+
+    <div class="panel preview">
+      <div class="preview-header">
+        <h2>Preview</h2>
+        <div id="summary" class="summary"></div>
+      </div>
+      <div id="svgWrap" class="svg-wrap"></div>
+    </div>
+  </main>
+
+</div>
+<script src="grid-math.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
