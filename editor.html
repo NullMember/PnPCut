@@ -6,7 +6,7 @@
 <title>Card Line Art Editor</title>
 <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body class="editor-page">
 <div class="container">
 
   <header>
@@ -26,11 +26,11 @@
         <div class="panel-title">Card</div>
         <div class="control-group">
           <label for="cardW">Width (mm)</label>
-          <input type="number" id="cardW" value="88" min="1" step="0.1" required>
+          <input type="number" id="cardW" value="63" min="1" step="0.1" required>
         </div>
         <div class="control-group">
           <label for="cardH">Height (mm)</label>
-          <input type="number" id="cardH" value="63" min="1" step="0.1" required>
+          <input type="number" id="cardH" value="88" min="1" step="0.1" required>
         </div>
         <div class="control-group">
           <label for="imageInput">Reference image</label>
@@ -42,29 +42,11 @@
       </div>
 
       <div class="panel">
-        <div class="panel-title">Tool</div>
-        <div class="tool-buttons" id="toolButtons">
-          <button type="button" data-tool="select" class="tool-btn active" title="Select / Move">Select</button>
-          <button type="button" data-tool="line" class="tool-btn" title="Line">Line</button>
-          <button type="button" data-tool="rect" class="tool-btn" title="Rectangle">Rect</button>
-          <button type="button" data-tool="ellipse" class="tool-btn" title="Ellipse">Ellipse</button>
-          <button type="button" data-tool="polygon" class="tool-btn" title="Polygon / lasso">Polygon</button>
+        <div class="panel-title">Canvas</div>
+        <div class="control-group">
+          <label class="inline"><input type="checkbox" id="snapToggle" checked> Snap to shapes / card edges</label>
         </div>
-        <div class="input-hint">Line/Rect/Ellipse: click-drag. Polygon: click each point, then click back on the first point to close. Shift snaps angles.</div>
-      </div>
-
-      <div class="panel">
-        <div class="panel-title">Active Layer</div>
-        <div class="layer-buttons" id="layerButtons">
-          <button type="button" data-layer="cut" class="layer-btn active">Cut</button>
-          <button type="button" data-layer="score" class="layer-btn">Score/Fold</button>
-          <button type="button" data-layer="emboss" class="layer-btn">Emboss</button>
-        </div>
-        <div class="layer-visibility" id="layerVisibility">
-          <label class="inline"><input type="checkbox" data-vis="cut" checked> <span class="swatch swatch-cut"></span> Cut</label>
-          <label class="inline"><input type="checkbox" data-vis="score" checked> <span class="swatch swatch-score"></span> Score/Fold</label>
-          <label class="inline"><input type="checkbox" data-vis="emboss" checked> <span class="swatch swatch-emboss"></span> Emboss</label>
-        </div>
+        <div class="input-hint">Tool: left of canvas &middot; Layer: top of canvas &middot; click-drag empty canvas to box-select, shift-click to add/remove &middot; scroll to pan &middot; Ctrl/Cmd+scroll or pinch to zoom &middot; hold Space or middle-click drag to pan &middot; hold Alt while dragging to disable snapping.</div>
       </div>
 
       <div class="panel">
@@ -93,7 +75,46 @@
     </div>
 
     <div class="main">
-      <div class="canvas-wrap" id="canvasWrap"></div>
+      <div class="canvas-stage">
+        <div class="canvas-topbar">
+          <span class="canvas-topbar-label">Layer</span>
+          <div class="layer-bar" id="layerBar">
+            <div class="layer-row" data-layer="cut">
+              <input type="checkbox" data-vis="cut" checked title="Show Cut layer">
+              <input type="color" class="layer-color" data-layer="cut" value="#c0392b" title="Cut line color">
+              <button type="button" class="layer-btn active" data-layer="cut">Cut</button>
+            </div>
+            <div class="layer-row" data-layer="score">
+              <input type="checkbox" data-vis="score" checked title="Show Score/Fold layer">
+              <input type="color" class="layer-color" data-layer="score" value="#e08e0b" title="Score/Fold line color">
+              <button type="button" class="layer-btn" data-layer="score">Score/Fold</button>
+            </div>
+            <div class="layer-row" data-layer="emboss">
+              <input type="checkbox" data-vis="emboss" checked title="Show Emboss layer">
+              <input type="color" class="layer-color" data-layer="emboss" value="#2e8b57" title="Emboss line color">
+              <button type="button" class="layer-btn" data-layer="emboss">Emboss</button>
+            </div>
+          </div>
+        </div>
+        <div class="canvas-body">
+          <div class="canvas-toolbar-left" id="toolButtons">
+            <button type="button" data-tool="select" class="tool-btn active" title="Select / Move (click-drag empty canvas to box-select)">Select</button>
+            <button type="button" data-tool="line" class="tool-btn" title="Line">Line</button>
+            <button type="button" data-tool="rect" class="tool-btn" title="Rectangle">Rect</button>
+            <button type="button" data-tool="ellipse" class="tool-btn" title="Ellipse">Ellipse</button>
+            <button type="button" data-tool="polygon" class="tool-btn" title="Polygon / lasso">Polygon</button>
+          </div>
+          <div class="canvas-wrap" id="canvasWrap"></div>
+          <div class="canvas-toolbar">
+            <button type="button" id="zoomOutBtn" class="zoom-btn" title="Zoom out (Ctrl/Cmd -)">&minus;</button>
+            <span id="zoomLevel" class="zoom-level">100%</span>
+            <button type="button" id="zoomInBtn" class="zoom-btn" title="Zoom in (Ctrl/Cmd +)">+</button>
+            <span class="zoom-sep"></span>
+            <button type="button" id="zoomResetBtn" class="zoom-btn zoom-btn-wide" title="Zoom to 100% (Ctrl/Cmd 0)">100%</button>
+            <button type="button" id="zoomFitBtn" class="zoom-btn zoom-btn-wide" title="Fit to screen (Shift 1)">Fit</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="gallery-sidebar">
@@ -143,7 +164,7 @@
           <button type="button" id="redoBtn" class="btn-secondary" title="Ctrl/Cmd+Shift+Z">Redo</button>
         </div>
 
-        <p class="input-hint">Delete = remove selected shape &middot; Arrow keys = nudge 0.1mm (1mm with shift) &middot; Reference image is never exported.</p>
+        <p class="input-hint">Delete = remove selected shape &middot; Arrow keys = nudge 0.1mm (1mm with shift) &middot; Ctrl/Cmd+A select all, +C copy, +X cut, +V paste &middot; Reference image is never exported.</p>
       </div>
     </div>
 

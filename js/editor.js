@@ -1,10 +1,13 @@
 (() => {
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const PX_PER_MM = 6;
-  const HANDLE_R = 1.8;
   const ROTATE_HANDLE_OFFSET = 9;
-  const LAYER_COLORS = { cut: '#c0392b', score: '#e08e0b', emboss: '#2e8b57' };
+  const DEFAULT_LAYER_COLORS = { cut: '#c0392b', score: '#e08e0b', emboss: '#2e8b57' };
   const MIN_SIZE = 0.5;
+  const MIN_ZOOM = 0.1;
+  const MAX_ZOOM = 16;
+  const SNAP_PX = 8;
+  const HANDLE_R_PX = 6;
 
   const $ = (id) => document.getElementById(id);
 
@@ -14,8 +17,7 @@
     imageInput: $('imageInput'),
     imageVisible: $('imageVisible'),
     toolButtons: $('toolButtons'),
-    layerButtons: $('layerButtons'),
-    layerVisibility: $('layerVisibility'),
+    layerBar: $('layerBar'),
     saveProjectBtn: $('saveProjectBtn'),
     loadProjectInput: $('loadProjectInput'),
     mirrorExport: $('mirrorExport'),
@@ -37,23 +39,32 @@
     deleteShapeBtn: $('deleteShapeBtn'),
     undoBtn: $('undoBtn'),
     redoBtn: $('redoBtn'),
+    zoomOutBtn: $('zoomOutBtn'),
+    zoomInBtn: $('zoomInBtn'),
+    zoomResetBtn: $('zoomResetBtn'),
+    zoomFitBtn: $('zoomFitBtn'),
+    zoomLevel: $('zoomLevel'),
+    snapToggle: $('snapToggle'),
   };
 
   const state = {
-    cardW: 88,
-    cardH: 63,
+    cardW: 63,
+    cardH: 88,
     imageDataUrl: null,
     imageVisible: true,
     tool: 'select',
     activeLayer: 'cut',
     layerVisible: { cut: true, score: true, emboss: true },
+    layerColors: { ...DEFAULT_LAYER_COLORS },
     shapes: [],
     nextId: 1,
-    selectedId: null,
+    selectedIds: [],
+    zoom: 1,
   };
 
   let history = [];
   let historyIndex = -1;
+  let snapEnabled = true;
 
   // ---------- geometry helpers ----------
 
@@ -88,6 +99,186 @@
       w: Math.abs(x2 - x1),
       h: Math.abs(y2 - y1),
     };
+  }
+
+  // ---------- snapping ----------
+
+  function snapThresholdMm() {
+    return SNAP_PX / (PX_PER_MM * state.zoom);
+  }
+
+  function shapePoints(shape) {
+    const local = [
+      { x: 0, y: 0 }, { x: shape.w, y: 0 }, { x: shape.w, y: shape.h }, { x: 0, y: shape.h },
+      { x: shape.w / 2, y: 0 }, { x: shape.w, y: shape.h / 2 }, { x: shape.w / 2, y: shape.h }, { x: 0, y: shape.h / 2 },
+      { x: shape.w / 2, y: shape.h / 2 },
+    ];
+    if (shape.type === 'line') {
+      const p1 = shape.diag === 'tlbr' ? { x: 0, y: 0 } : { x: shape.w, y: 0 };
+      const p2 = shape.diag === 'tlbr' ? { x: shape.w, y: shape.h } : { x: 0, y: shape.h };
+      local.push(p1, p2);
+    }
+    if (shape.type === 'polygon' && shape.points) {
+      shape.points.forEach((p) => local.push({ x: p.fx * shape.w, y: p.fy * shape.h }));
+    }
+    return local.map((lp) => worldFromLocal(shape, lp));
+  }
+
+  function collectSnapCandidates(excludeIds) {
+    const pts = [];
+    const cw = state.cardW, ch = state.cardH;
+    [0, cw / 2, cw].forEach((x) => [0, ch / 2, ch].forEach((y) => pts.push({ x, y })));
+    state.shapes.forEach((shape) => {
+      if (excludeIds.includes(shape.id)) return;
+      pts.push(...shapePoints(shape));
+    });
+    return pts;
+  }
+
+  function resolvePointSnap(rawPoint, excludeIds, enabled, extraPoints) {
+    if (!enabled) return { x: rawPoint.x, y: rawPoint.y, guides: [] };
+    const thresh = snapThresholdMm();
+    const candidates = collectSnapCandidates(excludeIds).concat(extraPoints || []);
+    let bestX = null, bestXDist = thresh;
+    let bestY = null, bestYDist = thresh;
+    candidates.forEach((c) => {
+      const dx = Math.abs(c.x - rawPoint.x);
+      if (dx < bestXDist) { bestXDist = dx; bestX = c.x; }
+      const dy = Math.abs(c.y - rawPoint.y);
+      if (dy < bestYDist) { bestYDist = dy; bestY = c.y; }
+    });
+    const guides = [];
+    if (bestX != null) guides.push({ type: 'v', x: bestX });
+    if (bestY != null) guides.push({ type: 'h', y: bestY });
+    return { x: bestX != null ? bestX : rawPoint.x, y: bestY != null ? bestY : rawPoint.y, guides };
+  }
+
+  // The 8 octant directions for 45deg-step constraining, as exact
+  // coordinates rather than cos/sin of a reconstructed angle: Math.PI isn't
+  // exactly pi, so e.g. Math.sin(Math.round(...) * (Math.PI/4)) for a
+  // "horizontal" 180deg step comes out ~1e-16 instead of exactly 0. That
+  // tiny residue used to survive as a non-zero shape.h/w on straight lines
+  // and get floored back up to MIN_SIZE by group-scale, kinking the line.
+  const OCTANT_DIRS = [
+    { x: 1, y: 0 }, { x: Math.SQRT1_2, y: Math.SQRT1_2 },
+    { x: 0, y: 1 }, { x: -Math.SQRT1_2, y: Math.SQRT1_2 },
+    { x: -1, y: 0 }, { x: -Math.SQRT1_2, y: -Math.SQRT1_2 },
+    { x: 0, y: -1 }, { x: Math.SQRT1_2, y: -Math.SQRT1_2 },
+  ];
+
+  // Constrains a point to 45deg steps from `fixed`, while still letting the
+  // distance along that locked direction snap to nearby points that lie
+  // close to the line (so Shift-straightening a line doesn't kill snapping).
+  function angleConstrainedPoint(fixed, rawPoint, excludeIds, enabled) {
+    const dx = rawPoint.x - fixed.x, dy = rawPoint.y - fixed.y;
+    const octant = ((Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) % 8) + 8) % 8;
+    const dir = OCTANT_DIRS[octant];
+    let t = dx * dir.x + dy * dir.y;
+    const guides = [];
+    if (enabled) {
+      const thresh = snapThresholdMm();
+      let bestT = null, bestDist = thresh, bestPoint = null;
+      collectSnapCandidates(excludeIds).forEach((c) => {
+        const vx = c.x - fixed.x, vy = c.y - fixed.y;
+        const ct = vx * dir.x + vy * dir.y;
+        const perp = Math.abs(vx * dir.y - vy * dir.x);
+        if (perp < thresh) {
+          const d = Math.abs(ct - t);
+          if (d < bestDist) { bestDist = d; bestT = ct; bestPoint = c; }
+        }
+      });
+      if (bestT != null) {
+        t = bestT;
+        guides.push({ type: 'v', x: bestPoint.x }, { type: 'h', y: bestPoint.y });
+      }
+    }
+    return { point: { x: fixed.x + dir.x * t, y: fixed.y + dir.y * t }, guides };
+  }
+
+  function boxesIntersect(a, b) {
+    return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  }
+
+  // Shared core: given a set of world points that would move rigidly together
+  // and a set of candidate points to align to, finds the single best x/y
+  // offset (independently per axis) that would snap ANY of those points onto
+  // a candidate. Used for both single-shape and whole-group moves so every
+  // member of a group gets to contribute its own edges/corners, not just one.
+  function snapOffsetForPoints(points, candidates, thresh) {
+    let bestDx = 0, bestDxAbs = thresh, bestDxGuide = null;
+    let bestDy = 0, bestDyAbs = thresh, bestDyGuide = null;
+    points.forEach((p) => {
+      candidates.forEach((c) => {
+        const dx = c.x - p.x;
+        if (Math.abs(dx) < bestDxAbs) { bestDxAbs = Math.abs(dx); bestDx = dx; bestDxGuide = c.x; }
+        const dy = c.y - p.y;
+        if (Math.abs(dy) < bestDyAbs) { bestDyAbs = Math.abs(dy); bestDy = dy; bestDyGuide = c.y; }
+      });
+    });
+    const guides = [];
+    if (bestDxGuide != null) guides.push({ type: 'v', x: bestDxGuide });
+    if (bestDyGuide != null) guides.push({ type: 'h', y: bestDyGuide });
+    return { dx: bestDx, dy: bestDy, guides };
+  }
+
+  function snapMoveShape(shape, rawX, rawY, enabled, excludeIds) {
+    if (!enabled) return { x: rawX, y: rawY, guides: [] };
+    const thresh = snapThresholdMm();
+    const candidates = collectSnapCandidates(excludeIds || [shape.id]);
+    const pts = shapePoints({ ...shape, x: rawX, y: rawY });
+    const res = snapOffsetForPoints(pts, candidates, thresh);
+    return { x: rawX + res.dx, y: rawY + res.dy, guides: res.guides };
+  }
+
+  // Moves a whole selection rigidly: tests every shape's own points (not
+  // just one representative shape) against the rest of the canvas, so a
+  // group's left/right/top/bottom/center edges can all snap, regardless of
+  // which member happens to be first in the selection.
+  function snapMoveGroup(ids, origins, rawDx, rawDy, enabled) {
+    if (!enabled) return { dx: rawDx, dy: rawDy, guides: [] };
+    const thresh = snapThresholdMm();
+    const candidates = collectSnapCandidates(ids);
+    let pts = [];
+    ids.forEach((id) => {
+      const s = state.shapes.find((sh) => sh.id === id);
+      const o = origins.get(id);
+      if (!s || !o) return;
+      pts = pts.concat(shapePoints({ ...s, x: o.x + rawDx, y: o.y + rawDy }));
+    });
+    const res = snapOffsetForPoints(pts, candidates, thresh);
+    return { dx: rawDx + res.dx, dy: rawDy + res.dy, guides: res.guides };
+  }
+
+  function renderSnapGuides(guides) {
+    overlayGroup.querySelectorAll('.snap-guide').forEach((n) => n.remove());
+    if (!guides || !guides.length) return;
+    const margin = Math.max(state.cardW, state.cardH) * 2;
+    guides.forEach((g) => {
+      const line = document.createElementNS(SVG_NS, 'line');
+      if (g.type === 'v') {
+        line.setAttribute('x1', g.x); line.setAttribute('y1', -margin);
+        line.setAttribute('x2', g.x); line.setAttribute('y2', state.cardH + margin);
+      } else {
+        line.setAttribute('x1', -margin); line.setAttribute('y1', g.y);
+        line.setAttribute('x2', state.cardW + margin); line.setAttribute('y2', g.y);
+      }
+      line.setAttribute('class', 'snap-guide');
+      line.setAttribute('vector-effect', 'non-scaling-stroke');
+      overlayGroup.appendChild(line);
+    });
+  }
+
+  function renderSnapPointMarker(point) {
+    overlayGroup.querySelectorAll('.snap-point').forEach((n) => n.remove());
+    if (!point) return;
+    const r = HANDLE_R_PX * 0.55 / (PX_PER_MM * state.zoom);
+    const c = document.createElementNS(SVG_NS, 'circle');
+    c.setAttribute('cx', point.x);
+    c.setAttribute('cy', point.y);
+    c.setAttribute('r', r);
+    c.setAttribute('class', 'snap-point');
+    c.setAttribute('vector-effect', 'non-scaling-stroke');
+    overlayGroup.appendChild(c);
   }
 
   // ---------- SVG canvas setup ----------
@@ -127,16 +318,22 @@
     els.canvasWrap.appendChild(svg);
 
     svg.addEventListener('pointerdown', onCanvasPointerDown);
+    svg.addEventListener('pointerleave', () => {
+      if (drag) return;
+      renderSnapGuides([]);
+      renderSnapPointMarker(null);
+    });
   }
 
   function updateSvgSize() {
     svg.setAttribute('viewBox', `0 0 ${state.cardW} ${state.cardH}`);
-    svg.setAttribute('width', state.cardW * PX_PER_MM);
-    svg.setAttribute('height', state.cardH * PX_PER_MM);
+    svg.setAttribute('width', state.cardW * PX_PER_MM * state.zoom);
+    svg.setAttribute('height', state.cardH * PX_PER_MM * state.zoom);
     if (imageEl) {
       imageEl.setAttribute('width', state.cardW);
       imageEl.setAttribute('height', state.cardH);
     }
+    if (els.zoomLevel) els.zoomLevel.textContent = `${Math.round(state.zoom * 100)}%`;
   }
 
   function svgPoint(evt) {
@@ -144,6 +341,95 @@
     pt.x = evt.clientX;
     pt.y = evt.clientY;
     return pt.matrixTransform(svg.getScreenCTM().inverse());
+  }
+
+  // ---------- zoom / pan ----------
+
+  function clampZoom(z) {
+    return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
+  }
+
+  function setZoom(newZoom, clientX, clientY) {
+    newZoom = clampZoom(newZoom);
+    if (Math.abs(newZoom - state.zoom) < 0.001) return;
+    const wrap = els.canvasWrap;
+    const rect = wrap.getBoundingClientRect();
+    const ax = clientX != null ? clientX : rect.left + rect.width / 2;
+    const ay = clientY != null ? clientY : rect.top + rect.height / 2;
+
+    const before = svg.createSVGPoint();
+    before.x = ax; before.y = ay;
+    const mm = before.matrixTransform(svg.getScreenCTM().inverse());
+
+    state.zoom = newZoom;
+    updateSvgSize();
+
+    const after = svg.createSVGPoint();
+    after.x = mm.x; after.y = mm.y;
+    const screenPos = after.matrixTransform(svg.getScreenCTM());
+
+    wrap.scrollLeft += screenPos.x - ax;
+    wrap.scrollTop += screenPos.y - ay;
+    renderOverlay();
+  }
+
+  function zoomBy(factor, clientX, clientY) {
+    setZoom(state.zoom * factor, clientX, clientY);
+  }
+
+  function fitZoom() {
+    const wrap = els.canvasWrap;
+    const availW = Math.max(40, wrap.clientWidth - 32);
+    const availH = Math.max(40, wrap.clientHeight - 32);
+    const z = Math.min(availW / (state.cardW * PX_PER_MM), availH / (state.cardH * PX_PER_MM));
+    state.zoom = clampZoom(z || 1);
+    updateSvgSize();
+    wrap.scrollLeft = 0;
+    wrap.scrollTop = 0;
+    renderOverlay();
+  }
+
+  els.zoomInBtn.addEventListener('click', () => zoomBy(1.25));
+  els.zoomOutBtn.addEventListener('click', () => zoomBy(0.8));
+  els.zoomResetBtn.addEventListener('click', () => setZoom(1));
+  els.zoomFitBtn.addEventListener('click', fitZoom);
+
+  els.canvasWrap.addEventListener('wheel', (evt) => {
+    if (!(evt.ctrlKey || evt.metaKey)) return;
+    evt.preventDefault();
+    const factor = Math.exp(-evt.deltaY * 0.0018);
+    zoomBy(factor, evt.clientX, evt.clientY);
+  }, { passive: false });
+
+  els.snapToggle.addEventListener('change', () => {
+    snapEnabled = els.snapToggle.checked;
+  });
+
+  // ---- space / middle-click panning ----
+
+  let spaceDown = false;
+  let panDrag = null;
+
+  function startPanDrag(evt) {
+    const wrap = els.canvasWrap;
+    panDrag = { startX: evt.clientX, startY: evt.clientY, scrollLeft: wrap.scrollLeft, scrollTop: wrap.scrollTop };
+    wrap.classList.add('panning');
+    window.addEventListener('pointermove', onPanMove);
+    window.addEventListener('pointerup', onPanEnd);
+  }
+
+  function onPanMove(evt) {
+    if (!panDrag) return;
+    const wrap = els.canvasWrap;
+    wrap.scrollLeft = panDrag.scrollLeft - (evt.clientX - panDrag.startX);
+    wrap.scrollTop = panDrag.scrollTop - (evt.clientY - panDrag.startY);
+  }
+
+  function onPanEnd() {
+    panDrag = null;
+    els.canvasWrap.classList.remove('panning');
+    window.removeEventListener('pointermove', onPanMove);
+    window.removeEventListener('pointerup', onPanEnd);
   }
 
   // ---------- shape rendering ----------
@@ -173,7 +459,7 @@
     const d = describeShape(shape);
     if (!d) return '';
     const attrs = Object.entries(d.attrs).map(([k, v]) => `${k}="${round(v)}"`).join(' ');
-    return `<g transform="${d.transform}"><${d.tag} ${attrs} fill="none" stroke="${LAYER_COLORS[shape.layer]}" stroke-width="0.15"/></g>`;
+    return `<g transform="${d.transform}"><${d.tag} ${attrs} fill="none" stroke="${state.layerColors[shape.layer]}" stroke-width="0.15"/></g>`;
   }
 
   function round(n) {
@@ -190,7 +476,7 @@
     const prim = document.createElementNS(SVG_NS, d.tag);
     Object.entries(d.attrs).forEach(([k, v]) => prim.setAttribute(k, v));
     prim.setAttribute('fill', 'none');
-    prim.setAttribute('stroke', LAYER_COLORS[shape.layer]);
+    prim.setAttribute('stroke', state.layerColors[shape.layer]);
     prim.setAttribute('stroke-width', '0.15');
     prim.setAttribute('vector-effect', 'non-scaling-stroke');
     prim.classList.add('shape-hit');
@@ -223,69 +509,151 @@
     { key: 'w', local: (s) => ({ x: 0, y: s.h / 2 }) },
   ];
 
-  function selectedShape() {
-    return state.shapes.find((s) => s.id === state.selectedId) || null;
-  }
-
-  function renderOverlay() {
-    overlayGroup.innerHTML = '';
-    const shape = selectedShape();
-    if (!shape) return;
-
-    const corners = [
+  function shapeCorners(shape) {
+    return [
       worldFromLocal(shape, { x: 0, y: 0 }),
       worldFromLocal(shape, { x: shape.w, y: 0 }),
       worldFromLocal(shape, { x: shape.w, y: shape.h }),
       worldFromLocal(shape, { x: 0, y: shape.h }),
     ];
-    const outline = document.createElementNS(SVG_NS, 'polygon');
-    outline.setAttribute('points', corners.map((p) => `${p.x},${p.y}`).join(' '));
-    outline.setAttribute('fill', 'none');
-    outline.setAttribute('stroke', '#4a90d9');
-    outline.setAttribute('stroke-width', '0.3');
-    outline.setAttribute('stroke-dasharray', '1.2,1');
-    outline.setAttribute('vector-effect', 'non-scaling-stroke');
-    overlayGroup.appendChild(outline);
+  }
 
-    HANDLE_DEFS.forEach((def) => {
-      const wp = worldFromLocal(shape, def.local(shape));
-      const c = document.createElementNS(SVG_NS, 'circle');
-      c.setAttribute('cx', wp.x);
-      c.setAttribute('cy', wp.y);
-      c.setAttribute('r', HANDLE_R);
-      c.setAttribute('class', 'handle');
-      c.setAttribute('data-handle', def.key);
-      c.setAttribute('vector-effect', 'non-scaling-stroke');
-      overlayGroup.appendChild(c);
+  function lineEndpointsWorld(shape) {
+    const p1 = shape.diag === 'tlbr' ? { x: 0, y: 0 } : { x: shape.w, y: 0 };
+    const p2 = shape.diag === 'tlbr' ? { x: shape.w, y: shape.h } : { x: 0, y: shape.h };
+    return { p1: worldFromLocal(shape, p1), p2: worldFromLocal(shape, p2) };
+  }
+
+  const BOX_HANDLE_DEFS = [
+    { key: 'nw', get: (b) => ({ x: b.x, y: b.y }) },
+    { key: 'n', get: (b) => ({ x: b.x + b.w / 2, y: b.y }) },
+    { key: 'ne', get: (b) => ({ x: b.x + b.w, y: b.y }) },
+    { key: 'e', get: (b) => ({ x: b.x + b.w, y: b.y + b.h / 2 }) },
+    { key: 'se', get: (b) => ({ x: b.x + b.w, y: b.y + b.h }) },
+    { key: 's', get: (b) => ({ x: b.x + b.w / 2, y: b.y + b.h }) },
+    { key: 'sw', get: (b) => ({ x: b.x, y: b.y + b.h }) },
+    { key: 'w', get: (b) => ({ x: b.x, y: b.y + b.h / 2 }) },
+  ];
+
+  function groupBoundingBox(ids) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    ids.forEach((id) => {
+      const s = state.shapes.find((sh) => sh.id === id);
+      if (!s) return;
+      shapePoints(s).forEach((p) => {
+        minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+        minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+      });
     });
+    if (!isFinite(minX)) return null;
+    return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+  }
 
-    const rotLocal = { x: shape.w / 2, y: -ROTATE_HANDLE_OFFSET };
-    const rotWorld = worldFromLocal(shape, rotLocal);
-    const nWorld = worldFromLocal(shape, { x: shape.w / 2, y: 0 });
-    const connector = document.createElementNS(SVG_NS, 'line');
-    connector.setAttribute('x1', nWorld.x); connector.setAttribute('y1', nWorld.y);
-    connector.setAttribute('x2', rotWorld.x); connector.setAttribute('y2', rotWorld.y);
-    connector.setAttribute('stroke', '#4a90d9');
-    connector.setAttribute('stroke-width', '0.3');
-    connector.setAttribute('vector-effect', 'non-scaling-stroke');
-    overlayGroup.appendChild(connector);
+  function selectedShape() {
+    if (state.selectedIds.length !== 1) return null;
+    return state.shapes.find((s) => s.id === state.selectedIds[0]) || null;
+  }
 
-    const rc = document.createElementNS(SVG_NS, 'circle');
-    rc.setAttribute('cx', rotWorld.x);
-    rc.setAttribute('cy', rotWorld.y);
-    rc.setAttribute('r', HANDLE_R);
-    rc.setAttribute('class', 'handle handle-rotate');
-    rc.setAttribute('data-handle', 'rotate');
-    rc.setAttribute('vector-effect', 'non-scaling-stroke');
-    overlayGroup.appendChild(rc);
+  function addHandleCircle(key, wp, handleR, extraClass) {
+    const c = document.createElementNS(SVG_NS, 'circle');
+    c.setAttribute('cx', wp.x);
+    c.setAttribute('cy', wp.y);
+    c.setAttribute('r', handleR);
+    c.setAttribute('class', extraClass ? `handle ${extraClass}` : 'handle');
+    c.setAttribute('data-handle', key);
+    c.setAttribute('vector-effect', 'non-scaling-stroke');
+    overlayGroup.appendChild(c);
+  }
+
+  function renderOverlay() {
+    overlayGroup.innerHTML = '';
+
+    if (state.selectedIds.length > 1) {
+      state.selectedIds.forEach((id) => {
+        const s = state.shapes.find((sh) => sh.id === id);
+        if (!s) return;
+        const outline = document.createElementNS(SVG_NS, 'polygon');
+        outline.setAttribute('points', shapeCorners(s).map((p) => `${p.x},${p.y}`).join(' '));
+        outline.setAttribute('class', 'multi-select-outline');
+        outline.setAttribute('vector-effect', 'non-scaling-stroke');
+        overlayGroup.appendChild(outline);
+      });
+
+      const box = groupBoundingBox(state.selectedIds);
+      if (box) {
+        const groupOutline = document.createElementNS(SVG_NS, 'rect');
+        groupOutline.setAttribute('x', box.x);
+        groupOutline.setAttribute('y', box.y);
+        groupOutline.setAttribute('width', box.w);
+        groupOutline.setAttribute('height', box.h);
+        groupOutline.setAttribute('class', 'group-select-outline');
+        groupOutline.setAttribute('vector-effect', 'non-scaling-stroke');
+        overlayGroup.appendChild(groupOutline);
+
+        const handleR = HANDLE_R_PX / (PX_PER_MM * state.zoom);
+        BOX_HANDLE_DEFS.forEach((def) => addHandleCircle(def.key, def.get(box), handleR));
+        addHandleCircle('move', { x: box.x + box.w / 2, y: box.y + box.h / 2 }, handleR, 'handle-move');
+      }
+      return;
+    }
+
+    const shape = selectedShape();
+    if (!shape) return;
+
+    const isLine = shape.type === 'line';
+
+    if (!isLine) {
+      const corners = shapeCorners(shape);
+      const outline = document.createElementNS(SVG_NS, 'polygon');
+      outline.setAttribute('points', corners.map((p) => `${p.x},${p.y}`).join(' '));
+      outline.setAttribute('fill', 'none');
+      outline.setAttribute('stroke', '#4a90d9');
+      outline.setAttribute('stroke-width', '0.3');
+      outline.setAttribute('stroke-dasharray', '1.2,1');
+      outline.setAttribute('vector-effect', 'non-scaling-stroke');
+      overlayGroup.appendChild(outline);
+    }
+
+    const handleR = HANDLE_R_PX / (PX_PER_MM * state.zoom);
+    const addHandle = (key, wp, extraClass) => addHandleCircle(key, wp, handleR, extraClass);
+
+    if (isLine) {
+      const { p1, p2 } = lineEndpointsWorld(shape);
+      addHandle('p1', p1);
+      addHandle('p2', p2);
+    } else {
+      HANDLE_DEFS.forEach((def) => addHandle(def.key, worldFromLocal(shape, def.local(shape))));
+
+      const rotLocal = { x: shape.w / 2, y: -ROTATE_HANDLE_OFFSET };
+      const rotWorld = worldFromLocal(shape, rotLocal);
+      const nWorld = worldFromLocal(shape, { x: shape.w / 2, y: 0 });
+      const connector = document.createElementNS(SVG_NS, 'line');
+      connector.setAttribute('x1', nWorld.x); connector.setAttribute('y1', nWorld.y);
+      connector.setAttribute('x2', rotWorld.x); connector.setAttribute('y2', rotWorld.y);
+      connector.setAttribute('stroke', '#4a90d9');
+      connector.setAttribute('stroke-width', '0.3');
+      connector.setAttribute('vector-effect', 'non-scaling-stroke');
+      overlayGroup.appendChild(connector);
+
+      addHandle('rotate', rotWorld, 'handle-rotate');
+    }
+
+    addHandle('move', worldCenter(shape), 'handle-move');
   }
 
   // ---------- properties panel ----------
 
   function refreshProps() {
+    if (state.selectedIds.length > 1) {
+      els.propsEmpty.hidden = false;
+      els.propsEmpty.textContent = `${state.selectedIds.length} shapes selected. Press Delete to remove.`;
+      els.propsForm.hidden = true;
+      return;
+    }
     const shape = selectedShape();
     if (!shape) {
       els.propsEmpty.hidden = false;
+      els.propsEmpty.textContent = 'No shape selected.';
       els.propsForm.hidden = true;
       return;
     }
@@ -324,11 +692,52 @@
   });
 
   function deleteSelected() {
-    if (!state.selectedId) return;
-    state.shapes = state.shapes.filter((s) => s.id !== state.selectedId);
-    state.selectedId = null;
+    if (!state.selectedIds.length) return;
+    const idSet = new Set(state.selectedIds);
+    state.shapes = state.shapes.filter((s) => !idSet.has(s.id));
+    state.selectedIds = [];
     fullRender();
     pushHistory();
+  }
+
+  // ---------- clipboard ----------
+
+  let clipboard = [];
+  let pasteCount = 0;
+
+  function copySelected() {
+    if (!state.selectedIds.length) return;
+    const idSet = new Set(state.selectedIds);
+    clipboard = state.shapes.filter((s) => idSet.has(s.id)).map((s) => JSON.parse(JSON.stringify(s)));
+    pasteCount = 0;
+  }
+
+  function cutSelected() {
+    if (!state.selectedIds.length) return;
+    copySelected();
+    deleteSelected();
+  }
+
+  function pasteClipboard() {
+    if (!clipboard.length) return;
+    pasteCount += 1;
+    const offset = 4 * pasteCount;
+    const newIds = [];
+    clipboard.forEach((c) => {
+      const s = JSON.parse(JSON.stringify(c));
+      s.id = state.nextId++;
+      s.x += offset;
+      s.y += offset;
+      state.shapes.push(s);
+      newIds.push(s.id);
+    });
+    selectShapes(newIds);
+    fullRender();
+    pushHistory();
+  }
+
+  function selectAll() {
+    selectShapes(state.shapes.map((s) => s.id));
   }
 
   // ---------- tool / layer toolbar ----------
@@ -340,17 +749,26 @@
     [...els.toolButtons.children].forEach((b) => b.classList.toggle('active', b === btn));
     cancelPolygonDraw();
     selectShape(null);
+    renderSnapGuides([]);
+    renderSnapPointMarker(null);
     updateCursor();
   });
 
-  els.layerButtons.addEventListener('click', (e) => {
+  els.layerBar.addEventListener('click', (e) => {
     const btn = e.target.closest('.layer-btn');
     if (!btn) return;
     state.activeLayer = btn.dataset.layer;
-    [...els.layerButtons.children].forEach((b) => b.classList.toggle('active', b === btn));
+    els.layerBar.querySelectorAll('.layer-btn').forEach((b) => b.classList.toggle('active', b === btn));
   });
 
-  els.layerVisibility.addEventListener('change', (e) => {
+  els.layerBar.addEventListener('change', (e) => {
+    const colorInput = e.target.closest('.layer-color');
+    if (colorInput) {
+      state.layerColors[colorInput.dataset.layer] = colorInput.value;
+      renderShapes();
+      if (polyDraft) renderPolyDraft();
+      return;
+    }
     const cb = e.target.closest('input[data-vis]');
     if (!cb) return;
     state.layerVisible[cb.dataset.vis] = cb.checked;
@@ -367,20 +785,42 @@
   let polyDraft = null; // { points: [{x,y}] }
 
   function onCanvasPointerDown(evt) {
+    if (spaceDown || evt.button === 1) {
+      evt.preventDefault();
+      startPanDrag(evt);
+      return;
+    }
+
     const handleEl = evt.target.closest('.handle');
     const shapeEl = evt.target.closest('.shape-el');
 
     if (handleEl) {
-      startHandleDrag(handleEl.dataset.handle, evt);
+      const handleKey = handleEl.dataset.handle;
+      if (state.selectedIds.length > 1) {
+        if (handleKey === 'move') {
+          startMoveDrag(evt);
+        } else {
+          startGroupHandleDrag(handleKey, evt);
+        }
+      } else {
+        startHandleDrag(handleKey, evt);
+      }
+      evt.stopPropagation();
       return;
     }
 
     if (state.tool === 'select') {
       if (shapeEl) {
-        selectShape(parseInt(shapeEl.dataset.id, 10));
+        const id = parseInt(shapeEl.dataset.id, 10);
+        if (evt.shiftKey) {
+          toggleSelect(id);
+          return;
+        }
+        if (!state.selectedIds.includes(id)) selectShape(id);
         startMoveDrag(evt);
       } else {
-        selectShape(null);
+        if (!evt.shiftKey) selectShape(null);
+        startMarqueeDrag(evt);
       }
       return;
     }
@@ -397,11 +837,20 @@
   }
 
   function startMoveDrag(evt) {
-    const shape = selectedShape();
-    if (!shape) return;
     const start = svgPoint(evt);
-    const origin = { x: shape.x, y: shape.y };
-    drag = { mode: 'move', shape, start, origin };
+    if (state.selectedIds.length > 1) {
+      const origins = new Map();
+      state.selectedIds.forEach((id) => {
+        const s = state.shapes.find((sh) => sh.id === id);
+        if (s) origins.set(id, { x: s.x, y: s.y });
+      });
+      drag = { mode: 'move-multi', ids: [...state.selectedIds], origins, start };
+    } else {
+      const shape = selectedShape();
+      if (!shape) return;
+      const origin = { x: shape.x, y: shape.y };
+      drag = { mode: 'move', shape, start, origin };
+    }
     window.addEventListener('pointermove', onDragMove);
     window.addEventListener('pointerup', onDragEnd);
   }
@@ -409,8 +858,14 @@
   function startHandleDrag(handleKey, evt) {
     const shape = selectedShape();
     if (!shape) return;
-    if (handleKey === 'rotate') {
+    if (handleKey === 'move') {
+      drag = { mode: 'move', shape, start: svgPoint(evt), origin: { x: shape.x, y: shape.y } };
+    } else if (handleKey === 'rotate') {
       drag = { mode: 'rotate', shape };
+    } else if (shape.type === 'line' && (handleKey === 'p1' || handleKey === 'p2')) {
+      const { p1, p2 } = lineEndpointsWorld(shape);
+      const fixed = handleKey === 'p1' ? p2 : p1;
+      drag = { mode: 'line-endpoint', shape, fixed };
     } else {
       drag = { mode: 'resize', shape, handle: handleKey, box0: { x: shape.x, y: shape.y, w: shape.w, h: shape.h } };
     }
@@ -419,8 +874,26 @@
     evt.stopPropagation();
   }
 
+  function startGroupHandleDrag(handleKey, evt) {
+    const ids = [...state.selectedIds];
+    const box0 = groupBoundingBox(ids);
+    if (!box0) return;
+    const origins = new Map();
+    ids.forEach((id) => {
+      const s = state.shapes.find((sh) => sh.id === id);
+      if (s) origins.set(id, { x: s.x, y: s.y, w: s.w, h: s.h });
+    });
+    drag = { mode: 'resize-group', ids, origins, handle: handleKey, box0 };
+    window.addEventListener('pointermove', onDragMove);
+    window.addEventListener('pointerup', onDragEnd);
+    evt.stopPropagation();
+  }
+
   function startCreateDrag(evt) {
-    const p = svgPoint(evt);
+    let p = svgPoint(evt);
+    const snapOn = snapEnabled && !evt.altKey;
+    const snapped = resolvePointSnap(p, [], snapOn);
+    p = { x: snapped.x, y: snapped.y };
     const id = state.nextId++;
     const shape = {
       id, type: state.tool, layer: state.activeLayer,
@@ -436,35 +909,115 @@
   function onDragMove(evt) {
     if (!drag) return;
     const p = svgPoint(evt);
+    const snapOn = snapEnabled && !evt.altKey;
+    let guides = [];
+
+    if (drag.mode === 'move-multi') {
+      const rawDx = p.x - drag.start.x;
+      const rawDy = p.y - drag.start.y;
+      const res = snapMoveGroup(drag.ids, drag.origins, rawDx, rawDy, snapOn);
+      drag.ids.forEach((id) => {
+        const s = state.shapes.find((sh) => sh.id === id);
+        const o = drag.origins.get(id);
+        if (s && o) { s.x = o.x + res.dx; s.y = o.y + res.dy; }
+      });
+      guides = res.guides;
+      fullRender();
+      renderSnapGuides(guides);
+      return;
+    }
+
+    if (drag.mode === 'resize-group') {
+      const box0 = drag.box0;
+      const res = resolvePointSnap(p, drag.ids, snapOn);
+      guides = res.guides;
+      let x1 = box0.x, y1 = box0.y, x2 = box0.x + box0.w, y2 = box0.y + box0.h;
+      const hk = drag.handle;
+      if (hk.includes('w')) x1 = res.x;
+      if (hk.includes('e')) x2 = res.x;
+      if (hk.includes('n')) y1 = res.y;
+      if (hk.includes('s')) y2 = res.y;
+      const box = normBox(x1, y1, x2, y2);
+      const newW = Math.max(MIN_SIZE, box.w);
+      const newH = Math.max(MIN_SIZE, box.h);
+      // Guard against a near-zero group bbox dimension blowing the scale
+      // factor up to something huge (e.g. a group of only-horizontal lines
+      // has box0.h ~ 0 until you actually drag a vertical handle).
+      const sx = box0.w > MIN_SIZE ? newW / box0.w : 1;
+      const sy = box0.h > MIN_SIZE ? newH / box0.h : 1;
+      drag.ids.forEach((id) => {
+        const s = state.shapes.find((sh) => sh.id === id);
+        const o = drag.origins.get(id);
+        if (!s || !o) return;
+        s.x = box.x + (o.x - box0.x) * sx;
+        s.y = box.y + (o.y - box0.y) * sy;
+        s.w = o.w === 0 ? 0 : Math.max(MIN_SIZE, o.w * sx);
+        s.h = o.h === 0 ? 0 : Math.max(MIN_SIZE, o.h * sy);
+      });
+      fullRender();
+      renderSnapGuides(guides);
+      return;
+    }
+
     const shape = drag.shape;
 
     if (drag.mode === 'move') {
-      shape.x = drag.origin.x + (p.x - drag.start.x);
-      shape.y = drag.origin.y + (p.y - drag.start.y);
+      const rawX = drag.origin.x + (p.x - drag.start.x);
+      const rawY = drag.origin.y + (p.y - drag.start.y);
+      const res = snapMoveShape(shape, rawX, rawY, snapOn);
+      shape.x = res.x; shape.y = res.y;
+      guides = res.guides;
     } else if (drag.mode === 'create') {
       let ex = p.x, ey = p.y;
       if (evt.shiftKey && shape.type === 'line') {
-        const dx = ex - drag.start.x, dy = ey - drag.start.y;
-        const len = Math.hypot(dx, dy);
-        const angle = Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) * (Math.PI / 4);
-        ex = drag.start.x + Math.cos(angle) * len;
-        ey = drag.start.y + Math.sin(angle) * len;
+        const res = angleConstrainedPoint(drag.start, p, [shape.id], snapOn);
+        ex = res.point.x; ey = res.point.y;
+        guides = res.guides;
+      } else {
+        const res = resolvePointSnap({ x: ex, y: ey }, [shape.id], snapOn);
+        ex = res.x; ey = res.y;
+        guides = res.guides;
       }
       const box = normBox(drag.start.x, drag.start.y, ex, ey);
       shape.x = box.x; shape.y = box.y; shape.w = box.w; shape.h = box.h;
       if (shape.type === 'line') {
         shape.diag = (ex - drag.start.x) * (ey - drag.start.y) >= 0 ? 'tlbr' : 'trbl';
       }
+    } else if (drag.mode === 'line-endpoint') {
+      const fixed = drag.fixed;
+      let moved;
+      if (evt.shiftKey) {
+        const res = angleConstrainedPoint(fixed, p, [shape.id], snapOn);
+        moved = res.point;
+        guides = res.guides;
+      } else {
+        const res = resolvePointSnap(p, [shape.id], snapOn, [fixed]);
+        guides = res.guides;
+        moved = { x: res.x, y: res.y };
+      }
+      const box = normBox(fixed.x, fixed.y, moved.x, moved.y);
+      shape.x = box.x; shape.y = box.y;
+      shape.w = box.w;
+      shape.h = box.h;
+      shape.diag = (fixed.x - moved.x) * (fixed.y - moved.y) >= 0 ? 'tlbr' : 'trbl';
     } else if (drag.mode === 'resize') {
       const box0 = drag.box0;
       const refShape = { x: box0.x, y: box0.y, w: box0.w, h: box0.h, rotation: shape.rotation };
-      const Lp = localFromWorld(refShape, p);
+      const res = resolvePointSnap(p, [shape.id], snapOn);
+      guides = res.guides;
+      // localFromWorld() returns a LOCAL coordinate (0..box0.w, 0..box0.h);
+      // x1/x2/y1/y2 below are WORLD coordinates (box0.x/box0.y-based), so the
+      // local value has to be re-based by box0.x/box0.y before mixing with
+      // them — omitting that (as this used to) mixes the two coordinate
+      // frames and throws the box to an unrelated position/size the moment
+      // box0.x or box0.y isn't 0.
+      const Lp = localFromWorld(refShape, { x: res.x, y: res.y });
       let x1 = box0.x, y1 = box0.y, x2 = box0.x + box0.w, y2 = box0.y + box0.h;
       const h = drag.handle;
-      if (h.includes('w')) x1 = Lp.x;
-      if (h.includes('e')) x2 = Lp.x;
-      if (h.includes('n')) y1 = Lp.y;
-      if (h.includes('s')) y2 = Lp.y;
+      if (h.includes('w')) x1 = box0.x + Lp.x;
+      if (h.includes('e')) x2 = box0.x + Lp.x;
+      if (h.includes('n')) y1 = box0.y + Lp.y;
+      if (h.includes('s')) y2 = box0.y + Lp.y;
       const box = normBox(x1, y1, x2, y2);
       shape.x = box.x; shape.y = box.y;
       shape.w = Math.max(MIN_SIZE, box.w);
@@ -478,6 +1031,7 @@
     }
 
     fullRender();
+    renderSnapGuides(guides);
   }
 
   function onDragEnd() {
@@ -495,13 +1049,19 @@
     }
     drag = null;
     fullRender();
+    renderSnapGuides([]);
+    renderSnapPointMarker(null);
     pushHistory();
   }
 
   // ---------- polygon tool ----------
 
   function handlePolygonClick(evt) {
-    const p = svgPoint(evt);
+    const raw = svgPoint(evt);
+    const snapOn = snapEnabled && !evt.altKey;
+    const snapped = resolvePointSnap(raw, [], snapOn);
+    const p = { x: snapped.x, y: snapped.y };
+    renderSnapGuides(snapped.guides);
     if (!polyDraft) {
       polyDraft = { points: [p] };
       renderPolyDraft();
@@ -541,7 +1101,11 @@
 
   function cancelPolygonDraw() {
     polyDraft = null;
-    if (overlayGroup) overlayGroup.querySelectorAll('.poly-draft').forEach((n) => n.remove());
+    if (overlayGroup) {
+      overlayGroup.querySelectorAll('.poly-draft').forEach((n) => n.remove());
+      overlayGroup.querySelectorAll('.snap-guide').forEach((n) => n.remove());
+      overlayGroup.querySelectorAll('.snap-point').forEach((n) => n.remove());
+    }
   }
 
   function renderPolyDraft() {
@@ -550,7 +1114,7 @@
     const pl = document.createElementNS(SVG_NS, 'polyline');
     pl.setAttribute('points', polyDraft.points.map((p) => `${p.x},${p.y}`).join(' '));
     pl.setAttribute('fill', 'none');
-    pl.setAttribute('stroke', LAYER_COLORS[state.activeLayer]);
+    pl.setAttribute('stroke', state.layerColors[state.activeLayer]);
     pl.setAttribute('stroke-width', '0.2');
     pl.setAttribute('stroke-dasharray', '1,0.6');
     pl.setAttribute('class', 'poly-draft');
@@ -560,7 +1124,7 @@
       const c = document.createElementNS(SVG_NS, 'circle');
       c.setAttribute('cx', p.x); c.setAttribute('cy', p.y); c.setAttribute('r', 1);
       c.setAttribute('class', 'poly-draft');
-      c.setAttribute('fill', LAYER_COLORS[state.activeLayer]);
+      c.setAttribute('fill', state.layerColors[state.activeLayer]);
       overlayGroup.appendChild(c);
     });
   }
@@ -568,13 +1132,18 @@
   document.addEventListener('pointermove', (evt) => {
     if (!polyDraft || state.tool !== 'polygon' || !svg) return;
     if (!svg.contains(evt.target) && evt.target !== svg) return;
-    const p = svgPoint(evt);
+    const raw = svgPoint(evt);
+    const snapOn = snapEnabled && !evt.altKey;
+    const snapped = resolvePointSnap(raw, [], snapOn);
+    const p = { x: snapped.x, y: snapped.y };
+    renderSnapGuides(snapped.guides);
+    renderSnapPointMarker(snapped.guides.length ? p : null);
     const pts = [...polyDraft.points, p];
     overlayGroup.querySelectorAll('.poly-draft').forEach((n) => n.remove());
     const pl = document.createElementNS(SVG_NS, 'polyline');
     pl.setAttribute('points', pts.map((pt) => `${pt.x},${pt.y}`).join(' '));
     pl.setAttribute('fill', 'none');
-    pl.setAttribute('stroke', LAYER_COLORS[state.activeLayer]);
+    pl.setAttribute('stroke', state.layerColors[state.activeLayer]);
     pl.setAttribute('stroke-width', '0.2');
     pl.setAttribute('stroke-dasharray', '1,0.6');
     pl.setAttribute('class', 'poly-draft');
@@ -582,12 +1151,75 @@
     overlayGroup.appendChild(pl);
   });
 
+  document.addEventListener('pointermove', (evt) => {
+    if (drag || panDrag || marquee || polyDraft) return;
+    if (!svg || !overlayGroup) return;
+    if (!['line', 'rect', 'ellipse'].includes(state.tool)) return;
+    if (!svg.contains(evt.target) && evt.target !== svg) return;
+    const raw = svgPoint(evt);
+    const snapOn = snapEnabled && !evt.altKey;
+    const snapped = resolvePointSnap(raw, [], snapOn);
+    renderSnapGuides(snapped.guides);
+    renderSnapPointMarker(snapped.guides.length ? { x: snapped.x, y: snapped.y } : null);
+  });
+
   // ---------- selection ----------
 
-  function selectShape(id) {
-    state.selectedId = id;
+  function selectShapes(ids) {
+    state.selectedIds = [...new Set(ids)];
     refreshProps();
     renderOverlay();
+  }
+
+  function selectShape(id) {
+    selectShapes(id == null ? [] : [id]);
+  }
+
+  function toggleSelect(id) {
+    const set = new Set(state.selectedIds);
+    if (set.has(id)) set.delete(id); else set.add(id);
+    selectShapes([...set]);
+  }
+
+  // ---- marquee (click-drag box selection) ----
+
+  let marquee = null;
+
+  function startMarqueeDrag(evt) {
+    const p = svgPoint(evt);
+    marquee = { start: p, additive: evt.shiftKey, base: evt.shiftKey ? [...state.selectedIds] : [] };
+    window.addEventListener('pointermove', onMarqueeMove);
+    window.addEventListener('pointerup', onMarqueeEnd);
+  }
+
+  function onMarqueeMove(evt) {
+    if (!marquee) return;
+    const p = svgPoint(evt);
+    const box = normBox(marquee.start.x, marquee.start.y, p.x, p.y);
+    const hits = state.shapes.filter((s) => boxesIntersect(s, box)).map((s) => s.id);
+    const ids = marquee.additive ? [...new Set([...marquee.base, ...hits])] : hits;
+    selectShapes(ids);
+    renderMarqueeRect(box);
+  }
+
+  function onMarqueeEnd() {
+    window.removeEventListener('pointermove', onMarqueeMove);
+    window.removeEventListener('pointerup', onMarqueeEnd);
+    marquee = null;
+    renderMarqueeRect(null);
+  }
+
+  function renderMarqueeRect(box) {
+    overlayGroup.querySelectorAll('.marquee-rect').forEach((n) => n.remove());
+    if (!box) return;
+    const r = document.createElementNS(SVG_NS, 'rect');
+    r.setAttribute('x', box.x);
+    r.setAttribute('y', box.y);
+    r.setAttribute('width', box.w);
+    r.setAttribute('height', box.h);
+    r.setAttribute('class', 'marquee-rect');
+    r.setAttribute('vector-effect', 'non-scaling-stroke');
+    overlayGroup.appendChild(r);
   }
 
   // ---------- full render ----------
@@ -617,7 +1249,7 @@
     const data = JSON.parse(snap);
     state.shapes = data.shapes;
     state.nextId = data.nextId;
-    state.selectedId = null;
+    state.selectedIds = [];
     fullRender();
   }
 
@@ -636,6 +1268,13 @@
   els.undoBtn.addEventListener('click', undo);
   els.redoBtn.addEventListener('click', redo);
 
+  window.addEventListener('keyup', (evt) => {
+    if (evt.key === ' ') {
+      spaceDown = false;
+      els.canvasWrap.classList.remove('pan-ready');
+    }
+  });
+
   // ---------- keyboard ----------
 
   window.addEventListener('keydown', (evt) => {
@@ -652,26 +1291,78 @@
       redo();
       return;
     }
+    if ((evt.ctrlKey || evt.metaKey) && (evt.key === '=' || evt.key === '+')) {
+      evt.preventDefault();
+      zoomBy(1.25);
+      return;
+    }
+    if ((evt.ctrlKey || evt.metaKey) && evt.key === '-') {
+      evt.preventDefault();
+      zoomBy(0.8);
+      return;
+    }
+    if ((evt.ctrlKey || evt.metaKey) && evt.key === '0') {
+      evt.preventDefault();
+      setZoom(1);
+      return;
+    }
+    if (!inField && evt.key === ' ' && !spaceDown) {
+      spaceDown = true;
+      evt.preventDefault();
+      els.canvasWrap.classList.add('pan-ready');
+      return;
+    }
     if (inField) return;
+
+    if (evt.shiftKey && evt.key === '1') {
+      evt.preventDefault();
+      fitZoom();
+      return;
+    }
+
+    if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === 'a') {
+      evt.preventDefault();
+      selectAll();
+      return;
+    }
+    if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === 'c') {
+      evt.preventDefault();
+      copySelected();
+      return;
+    }
+    if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === 'x') {
+      evt.preventDefault();
+      cutSelected();
+      return;
+    }
+    if ((evt.ctrlKey || evt.metaKey) && evt.key.toLowerCase() === 'v') {
+      evt.preventDefault();
+      pasteClipboard();
+      return;
+    }
 
     if (evt.key === 'Escape') {
       cancelPolygonDraw();
       selectShape(null);
       return;
     }
-    if ((evt.key === 'Delete' || evt.key === 'Backspace') && state.selectedId) {
+    if ((evt.key === 'Delete' || evt.key === 'Backspace') && state.selectedIds.length) {
       evt.preventDefault();
       deleteSelected();
       return;
     }
-    const shape = selectedShape();
-    if (shape && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(evt.key)) {
+    if (state.selectedIds.length && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(evt.key)) {
       evt.preventDefault();
       const step = evt.shiftKey ? 1 : 0.1;
-      if (evt.key === 'ArrowUp') shape.y -= step;
-      if (evt.key === 'ArrowDown') shape.y += step;
-      if (evt.key === 'ArrowLeft') shape.x -= step;
-      if (evt.key === 'ArrowRight') shape.x += step;
+      let dx = 0, dy = 0;
+      if (evt.key === 'ArrowUp') dy = -step;
+      if (evt.key === 'ArrowDown') dy = step;
+      if (evt.key === 'ArrowLeft') dx = -step;
+      if (evt.key === 'ArrowRight') dx = step;
+      state.selectedIds.forEach((id) => {
+        const s = state.shapes.find((sh) => sh.id === id);
+        if (s) { s.x += dx; s.y += dy; }
+      });
       fullRender();
       pushHistory();
     }
@@ -754,6 +1445,7 @@
       imageDataUrl: state.imageDataUrl,
       shapes: state.shapes,
       nextId: state.nextId,
+      layerColors: state.layerColors,
     };
     const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -777,7 +1469,11 @@
       state.imageDataUrl = project.imageDataUrl || null;
       state.shapes = project.shapes || [];
       state.nextId = project.nextId || 1;
-      state.selectedId = null;
+      state.selectedIds = [];
+      state.layerColors = { ...DEFAULT_LAYER_COLORS, ...(project.layerColors || {}) };
+      els.layerBar.querySelectorAll('.layer-color').forEach((input) => {
+        input.value = state.layerColors[input.dataset.layer];
+      });
       els.cardW.value = state.cardW;
       els.cardH.value = state.cardH;
       updateSvgSize();

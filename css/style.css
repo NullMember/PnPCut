@@ -85,6 +85,7 @@ header .subtitle {
 .content {
     display: grid;
     grid-template-columns: 340px 1fr;
+    grid-template-rows: minmax(0, 1fr);
     gap: 0;
     padding: 0;
     flex: 1;
@@ -104,6 +105,7 @@ header .subtitle {
     background: var(--surface);
     border-right: 1px solid var(--border);
     min-width: 0;
+    min-height: 0;
     overflow-y: auto;
 }
 
@@ -115,6 +117,7 @@ header .subtitle {
     background: var(--surface);
     border-left: 1px solid var(--border);
     min-width: 0;
+    min-height: 0;
     overflow-y: auto;
 }
 
@@ -123,6 +126,7 @@ header .subtitle {
     flex-direction: column;
     gap: 20px;
     min-width: 0;
+    min-height: 0;
     padding: 28px;
     overflow: auto;
     background: var(--bg);
@@ -876,13 +880,6 @@ button:disabled,
 
 /* ---- Segmented tool/layer button groups --------------------------------- */
 
-.tool-buttons,
-.layer-buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-
 .tool-btn,
 .layer-btn {
     flex: 1 1 auto;
@@ -905,23 +902,73 @@ button:disabled,
     color: #ffffff;
 }
 
-.layer-visibility {
+/* Vertical tool palette, docked to the left edge of the canvas */
+.canvas-toolbar-left {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    align-self: flex-start;
+    padding: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
-.swatch {
-    display: inline-block;
-    width: 10px;
-    height: 10px;
-    border-radius: 2px;
-    vertical-align: middle;
+.canvas-toolbar-left .tool-btn {
+    flex: none;
+    width: 74px;
 }
 
-.swatch-cut { background: #c0392b; }
-.swatch-score { background: #e08e0b; }
-.swatch-emboss { background: #2e8b57; }
+/* Layer bar docked above the canvas: visibility, color and active-layer pick */
+.canvas-topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.canvas-topbar-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-dim);
+}
+
+.layer-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+.layer-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.layer-row input[type="checkbox"] {
+    cursor: pointer;
+}
+
+.layer-color {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: none;
+    cursor: pointer;
+}
+
+.layer-row .layer-btn {
+    flex: none;
+}
 
 .summary {
     font-size: 12px;
@@ -955,21 +1002,30 @@ button:disabled,
     align-items: center;
 }
 
+/* Flex + auto margins (not justify/align-content) so the card centers on
+   both axes when it fits, but scrolls to every edge without clipping when
+   zoomed past the viewport — justify/align-content: center would clip the
+   start edge on overflow. */
+.canvas-wrap {
+    display: flex;
+}
+
 .svg-wrap svg,
 #canvasSvg {
-    max-width: 100%;
     height: auto;
     background: #ffffff;
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 }
 
-.canvas-wrap {
-    display: inline-flex;
+.svg-wrap svg {
+    max-width: 100%;
 }
 
 #canvasSvg {
     touch-action: none;
-    max-width: 70vw;
+    display: block;
+    margin: auto;
+    flex-shrink: 0;
 }
 
 circle.handle {
@@ -983,9 +1039,159 @@ circle.handle-rotate {
     fill: var(--accent);
 }
 
+circle.handle-move {
+    fill: var(--accent);
+    stroke: #ffffff;
+    cursor: move;
+}
+
 .shape-hit {
     cursor: move;
     pointer-events: stroke;
+}
+
+.snap-guide {
+    stroke: #ff3fb0;
+    stroke-width: 0.5;
+    stroke-dasharray: 2,1.4;
+    pointer-events: none;
+}
+
+.marquee-rect {
+    fill: rgba(74, 144, 217, 0.15);
+    stroke: #4a90d9;
+    stroke-width: 1;
+    stroke-dasharray: 3,2;
+    pointer-events: none;
+}
+
+.multi-select-outline {
+    fill: none;
+    stroke: #4a90d9;
+    stroke-width: 0.4;
+    stroke-dasharray: 1.2,1;
+    pointer-events: none;
+}
+
+.group-select-outline {
+    fill: none;
+    stroke: #4a90d9;
+    stroke-width: 0.4;
+    pointer-events: none;
+}
+
+.snap-point {
+    fill: #ff3fb0;
+    stroke: #ffffff;
+    stroke-width: 0.3;
+    pointer-events: none;
+}
+
+/* ---- Editor page: hard-cap the page to the viewport --------------------- */
+/* The flex/grid min-height:0 chain above should in theory let the canvas's
+   own overflow:auto do the scrolling, but a zoomed-in SVG's large intrinsic
+   size still ends up growing the page in some browsers. A hard viewport cap
+   + overflow:hidden on the shell is a guaranteed backstop: nothing inside
+   can push the page taller no matter how the inner sizing plays out. Scoped
+   to .editor-page (editor.html only) so it can't affect any other tool that
+   shares this stylesheet or PnPCut's own non-editor pages. */
+
+.editor-page {
+    height: 100vh;
+    overflow: hidden;
+}
+
+.editor-page .container {
+    height: 100vh;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ---- Canvas stage: layout, zoom/pan chrome ------------------------------ */
+
+.canvas-stage {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.canvas-body {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    gap: 10px;
+}
+
+.canvas-body .canvas-wrap {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+}
+
+.canvas-wrap.pan-ready,
+.canvas-wrap.pan-ready #canvasSvg {
+    cursor: grab;
+}
+
+.canvas-wrap.panning,
+.canvas-wrap.panning #canvasSvg {
+    cursor: grabbing !important;
+}
+
+.canvas-toolbar {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+.zoom-btn {
+    min-width: 26px;
+    height: 26px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.zoom-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent-hover);
+}
+
+.zoom-btn-wide {
+    font-size: 11px;
+}
+
+.zoom-level {
+    min-width: 42px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dim);
+}
+
+.zoom-sep {
+    width: 1px;
+    height: 18px;
+    background: var(--border);
+    margin: 0 2px;
 }
 
 /* ---- Properties / history panel ------------------------------------------ */

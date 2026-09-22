@@ -123,11 +123,12 @@
     return null;
   }
 
-  function shapeMarkup(shape) {
+  function shapeMarkup(shape, layerColors) {
     const d = describeShape(shape);
     if (!d) return '';
     const attrs = Object.entries(d.attrs).map(([k, v]) => `${k}="${round(v)}"`).join(' ');
-    return `<g transform="${d.transform}"><${d.tag} ${attrs} fill="none" stroke="${LAYER_COLORS[shape.layer]}" stroke-width="0.15"/></g>`;
+    const color = (layerColors && layerColors[shape.layer]) || LAYER_COLORS[shape.layer];
+    return `<g transform="${d.transform}"><${d.tag} ${attrs} fill="none" stroke="${color}" stroke-width="0.15"/></g>`;
   }
 
   function cutRectMarkup(cell, cardW, cardH, radius) {
@@ -136,6 +137,25 @@
   }
 
   // ---------- sheet body assembly ----------
+
+  // A loaded project's shapes were drawn against ITS OWN cardW/cardH (whatever
+  // the card editor had at save time). The sheet's own Card panel can be set
+  // to a different size — the project list even flags that mismatch with a
+  // ⚠ — but shapes were still only translated into place, never rescaled to
+  // match, so any mismatch silently drew everything at the wrong size versus
+  // the cut outline. Scale each shape into the sheet's own card size (a
+  // no-op, sx=sy=1, whenever the sizes already match).
+  function scaleShapeToCard(shape, sx, sy) {
+    const scaled = {
+      ...shape,
+      x: shape.x * sx,
+      y: shape.y * sy,
+      w: shape.w * sx,
+      h: shape.h * sy,
+    };
+    if (typeof shape.radius === 'number') scaled.radius = shape.radius * Math.min(sx, sy);
+    return scaled;
+  }
 
   function buildBodyMarkup(layout, layers) {
     let content = '';
@@ -147,11 +167,14 @@
         const filename = state.assignments[cellKey(cell)];
         const project = filename ? state.projects[filename] : null;
         if (project) {
+          const sx = project.cardW ? layout.cardW / project.cardW : 1;
+          const sy = project.cardH ? layout.cardH / project.cardH : 1;
           project.shapes
             .filter((s) => layers.includes(s.layer))
             .forEach((s) => {
-              const shifted = { ...s, x: s.x + cell.x, y: s.y + cell.y };
-              content += shapeMarkup(shifted) + '\n';
+              const scaled = scaleShapeToCard(s, sx, sy);
+              const shifted = { ...scaled, x: scaled.x + cell.x, y: scaled.y + cell.y };
+              content += shapeMarkup(shifted, project.layerColors) + '\n';
             });
         }
       }
@@ -160,10 +183,11 @@
   }
 
   function buildExportSVG(layout, layers, mirror) {
+    const guideRect = `<rect x="0" y="0" width="${round(layout.guideW)}" height="${round(layout.guideH)}" fill="none" stroke="${GUIDE_COLOR}" stroke-width="0.1"/>\n`;
     const body = buildBodyMarkup(layout, layers);
     const content = mirror
-      ? `<g transform="translate(${round(layout.guideW)},0) scale(-1,1)">\n${body}</g>`
-      : body;
+      ? `${guideRect}<g transform="translate(${round(layout.guideW)},0) scale(-1,1)">\n${body}</g>`
+      : guideRect + body;
     return `<svg xmlns="${SVG_NS}" width="${round(layout.guideW)}mm" height="${round(layout.guideH)}mm" viewBox="0 0 ${round(layout.guideW)} ${round(layout.guideH)}">\n${content}</svg>`;
   }
 
