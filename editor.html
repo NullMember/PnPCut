@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Card Line Art Editor</title>
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/tool.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="shared/icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#1a1d27">
+<script src="shared/pnp-theme.js"></script>
+<link rel="stylesheet" href="shared/pnp-shared.css">
 </head>
 <body class="editor-page">
 <div class="container">
@@ -25,12 +31,16 @@
       <div class="panel">
         <div class="panel-title">Card</div>
         <div class="control-group">
+          <label for="cardPreset">Preset</label>
+          <select id="cardPreset"></select>
+        </div>
+        <div class="control-group">
           <label for="cardW">Width (mm)</label>
-          <input type="number" id="cardW" value="63" min="1" step="0.1" required>
+          <input type="number" id="cardW" data-unit="mm" value="63" min="1" step="0.1" required>
         </div>
         <div class="control-group">
           <label for="cardH">Height (mm)</label>
-          <input type="number" id="cardH" value="88" min="1" step="0.1" required>
+          <input type="number" id="cardH" data-unit="mm" value="88" min="1" step="0.1" required>
         </div>
         <div class="control-group">
           <label for="imageInput">Reference image</label>
@@ -47,6 +57,21 @@
           <label class="inline"><input type="checkbox" id="snapToggle" checked> Snap to shapes / card edges</label>
         </div>
         <div class="input-hint">Tool: left of canvas &middot; Layer: top of canvas &middot; click-drag empty canvas to box-select, shift-click to add/remove &middot; scroll to pan &middot; Ctrl/Cmd+scroll or pinch to zoom &middot; hold Space or middle-click drag to pan &middot; hold Alt while dragging to disable snapping.</div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Templates</div>
+        <div class="control-group">
+          <label for="templateSelect">Add a starting shape</label>
+          <select id="templateSelect">
+            <option value="outline">Card outline, rounded corners (cut)</option>
+            <option value="round">Round token (cut)</option>
+            <option value="hex">Hex token (cut)</option>
+            <option value="foldMiddle">Fold-over card: centre fold (score)</option>
+            <option value="standee">Standee: outline + fold-under base (cut + score)</option>
+          </select>
+        </div>
+        <button type="button" id="addTemplateBtn" class="btn-secondary btn-small">Add to card</button>
       </div>
 
       <div class="panel">
@@ -132,23 +157,23 @@
           </div>
           <div class="control-group" id="propXWrap">
             <label for="propX">X (mm)</label>
-            <input type="number" id="propX" step="0.1">
+            <input type="number" id="propX" data-unit="mm" step="0.1">
           </div>
           <div class="control-group" id="propYWrap">
             <label for="propY">Y (mm)</label>
-            <input type="number" id="propY" step="0.1">
+            <input type="number" id="propY" data-unit="mm" step="0.1">
           </div>
           <div class="control-group" id="propWWrap">
             <label for="propW">Width (mm)</label>
-            <input type="number" id="propW" step="0.1">
+            <input type="number" id="propW" data-unit="mm" step="0.1">
           </div>
           <div class="control-group" id="propHWrap">
             <label for="propH">Height (mm)</label>
-            <input type="number" id="propH" step="0.1">
+            <input type="number" id="propH" data-unit="mm" step="0.1">
           </div>
           <div class="control-group" id="propRadiusWrap" hidden>
             <label for="propRadius">Corner radius (mm)</label>
-            <input type="number" id="propRadius" step="0.1" min="0">
+            <input type="number" id="propRadius" data-unit="mm" step="0.1" min="0">
           </div>
           <div class="control-group" id="propRotWrap">
             <label for="propRot">Rotation (deg)</label>
@@ -171,6 +196,7 @@
   </div>
 
 </div>
+<script src="shared/pnp-shared.js"></script>
 <script src="js/editor.js"></script>
 </body>
 </html>

@@ -20,6 +20,8 @@
     summary: $('summary'),
     svgWrap: $('svgWrap'),
     downloadBtn: $('downloadBtn'),
+    cutOffsetX: $('cutOffsetX'),
+    cutOffsetY: $('cutOffsetY'),
   };
 
   const PAPER_PRESETS = {
@@ -80,13 +82,17 @@
     const { guideW, guideH, cardW, cardH, radius, cards } = layout;
     const fmt = (n) => Math.round(n * 1000) / 1000;
 
+    const ox = num(els.cutOffsetX);
+    const oy = num(els.cutOffsetY);
     const cardRects = cards.map(({ x, y }) =>
       `  <rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(cardW)}" height="${fmt(cardH)}" rx="${fmt(radius)}" ry="${fmt(radius)}" fill="none" stroke="#c0392b" stroke-width="0.1"/>`
     ).join('\n');
 
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${fmt(guideW)}mm" height="${fmt(guideH)}mm" viewBox="0 0 ${fmt(guideW)} ${fmt(guideH)}">
   <rect x="0" y="0" width="${fmt(guideW)}" height="${fmt(guideH)}" fill="none" stroke="#2b6cb0" stroke-width="0.1"/>
+  <g transform="translate(${fmt(ox)},${fmt(oy)})">
 ${cardRects}
+  </g>
 </svg>`;
   }
 
@@ -159,11 +165,71 @@ ${cardRects}
 
   els.downloadBtn.addEventListener('click', downloadSVG);
 
-  ['cardW', 'cardH', 'radius', 'landscape', 'machineMargin', 'cols', 'rowsInput'].forEach((id) => {
+  // ---------- registration test sheet ----------
+
+  // Five targets (corners and centre of the guide area). Each is a 20 mm
+  // square to cut, with printed tick rows straddling every edge (0.5 mm
+  // steps, ±3 mm) so the cut's offset from the print can be read off directly.
+  function buildRegistrationSVG() {
+    const { guideW, guideH } = computeLayout();
+    const fmt = (n) => Math.round(n * 1000) / 1000;
+    const S = 20, inset = 18;
+    const centres = [
+      [inset + S / 2, inset + S / 2], [guideW - inset - S / 2, inset + S / 2],
+      [guideW / 2, guideH / 2],
+      [inset + S / 2, guideH - inset - S / 2], [guideW - inset - S / 2, guideH - inset - S / 2],
+    ];
+    let print = '', cut = '';
+    centres.forEach(([cx, cy]) => {
+      const x0 = cx - S / 2, y0 = cy - S / 2, x1 = cx + S / 2, y1 = cy + S / 2;
+      print += `  <rect x="${fmt(x0)}" y="${fmt(y0)}" width="${S}" height="${S}" fill="none" stroke="#000" stroke-width="0.15"/>\n`;
+      for (let t = -3; t <= 3.001; t += 0.5) {
+        const major = Math.abs(t % 1) < 1e-6;
+        const len = major ? 3 : 1.6;
+        const sw = t === 0 ? 0.25 : 0.12;
+        // A row of vertical ticks straddling the left/right edges: the cut
+        // edge falls between two ticks, which reads the horizontal offset.
+        [[x0, cy], [x1, cy]].forEach(([x, y]) => {
+          print += `  <line x1="${fmt(x + t)}" y1="${fmt(y - 4 - len)}" x2="${fmt(x + t)}" y2="${fmt(y - 4)}" stroke="#000" stroke-width="${sw}"/>\n`;
+        });
+        // Horizontal ticks straddling the top/bottom edges read the vertical offset.
+        [[cx, y0], [cx, y1]].forEach(([x, y]) => {
+          print += `  <line x1="${fmt(x - 4 - len)}" y1="${fmt(y + t)}" x2="${fmt(x - 4)}" y2="${fmt(y + t)}" stroke="#000" stroke-width="${sw}"/>\n`;
+        });
+      }
+      cut += `  <rect x="${fmt(x0)}" y="${fmt(y0)}" width="${S}" height="${S}" fill="none" stroke="#c0392b" stroke-width="0.1"/>\n`;
+    });
+    const note = `<text x="${fmt(guideW / 2)}" y="${fmt(guideH - 6)}" font-family="sans-serif" font-size="3" text-anchor="middle" fill="#000">PnPCut registration test — ticks every 0.5 mm, long ticks every 1 mm, thick tick = no offset</text>`;
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${fmt(guideW)}mm" height="${fmt(guideH)}mm" viewBox="0 0 ${fmt(guideW)} ${fmt(guideH)}">
+  <rect x="0" y="0" width="${fmt(guideW)}" height="${fmt(guideH)}" fill="none" stroke="#2b6cb0" stroke-width="0.1"/>
+  <g id="print">
+${print}  ${note}
+  </g>
+  <g id="cut">
+${cut}  </g>
+</svg>`;
+  }
+
+  $('registrationTestBtn').addEventListener('click', () => {
+    PnP.downloadBlob(new Blob([buildRegistrationSVG()], { type: 'image/svg+xml' }), 'registration-test.svg');
+  });
+
+  ['cardW', 'cardH', 'radius', 'landscape', 'machineMargin', 'cols', 'rowsInput', 'cutOffsetX', 'cutOffsetY'].forEach((id) => {
     els[id].addEventListener('input', render);
     els[id].addEventListener('change', render);
   });
 
   applyPaperPreset();
   render();
+
+  // ---------- Shared PnPTools wiring ----------
+
+  // The grid tool and the sheet assembler share one settings scope, so the
+  // same card/paper/grid is used on both pages.
+  PnP.bindPreset($('cardPreset'), els.cardW, els.cardH, 'card');
+  PnP.init({
+    tool: 'PnPCut',
+    settingsKey: 'PnPCut-grid',
+    project: {},
+  });
 })();

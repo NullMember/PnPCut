@@ -1,0 +1,461 @@
+/* PnPCut-only styles. The shared base lives in style.css (synced from the hub). */
+
+/* Overrides of shared rules: the editor fills the viewport height. */
+
+.content {
+    grid-template-rows: minmax(0, 1fr);
+}
+
+.sidebar,
+.gallery-sidebar,
+.main {
+    min-height: 0;
+}
+
+/* ==========================================================================
+   PnPVecImage-only additions
+   Toolbar/canvas editor chrome, layer swatches, SVG editing handles, and the
+   sheet-assembler project/cell lists — none of these have a shared
+   equivalent. Layer colors (cut/score/emboss/guide) are the actual exported
+   line-art colors, kept as-is regardless of UI theme.
+   ========================================================================== */
+
+/* ---- Cross-page nav (this tool has 3 pages: grid / editor / sheet) ------ */
+
+.tool-nav {
+    display: flex;
+    gap: 16px;
+    margin-top: 6px;
+}
+
+.nav-link {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.nav-link:hover {
+    color: var(--accent-hover);
+    text-decoration: underline;
+}
+
+.nav-link.current {
+    color: var(--text-dim);
+    pointer-events: none;
+    text-decoration: none;
+}
+
+/* ---- Segmented tool/layer button groups --------------------------------- */
+
+.tool-btn,
+.layer-btn {
+    flex: 1 1 auto;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: normal;
+    cursor: pointer;
+}
+
+.tool-btn.active,
+.layer-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #ffffff;
+}
+
+/* Vertical tool palette, docked to the left edge of the canvas */
+.canvas-toolbar-left {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-self: flex-start;
+    padding: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 16px var(--shadow);
+}
+
+.canvas-toolbar-left .tool-btn {
+    flex: none;
+    width: 74px;
+}
+
+/* Layer bar docked above the canvas: visibility, color and active-layer pick */
+.canvas-topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.canvas-topbar-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-dim);
+}
+
+.layer-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+.layer-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.layer-row input[type="checkbox"] {
+    cursor: pointer;
+}
+
+.layer-color {
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: none;
+    cursor: pointer;
+}
+
+.layer-row .layer-btn {
+    flex: none;
+}
+
+.summary {
+    font-size: 12px;
+    color: var(--text-dim);
+    line-height: 1.5;
+}
+
+/* ---- SVG preview / canvas surfaces --------------------------------------- */
+/* The exported artwork is placed on white paper, so the checkerboard stays
+   light-on-dark-surface instead of matching the app's own theme. */
+
+.svg-wrap,
+.canvas-wrap {
+    background:
+        linear-gradient(45deg, var(--checker) 25%, transparent 25%),
+        linear-gradient(-45deg, var(--checker) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, var(--checker) 75%),
+        linear-gradient(-45deg, transparent 75%, var(--checker) 75%);
+    background-color: var(--surface);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    overflow: auto;
+}
+
+.svg-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Flex + auto margins (not justify/align-content) so the card centers on
+   both axes when it fits, but scrolls to every edge without clipping when
+   zoomed past the viewport — justify/align-content: center would clip the
+   start edge on overflow. */
+.canvas-wrap {
+    display: flex;
+}
+
+.svg-wrap svg,
+#canvasSvg {
+    height: auto;
+    background: #ffffff;
+    box-shadow: 0 4px 24px var(--shadow);
+}
+
+.svg-wrap svg {
+    max-width: 100%;
+}
+
+#canvasSvg {
+    touch-action: none;
+    display: block;
+    margin: auto;
+    flex-shrink: 0;
+}
+
+circle.handle {
+    fill: var(--surface2);
+    stroke: var(--accent);
+    stroke-width: 0.5;
+    cursor: pointer;
+}
+
+circle.handle-rotate {
+    fill: var(--accent);
+}
+
+circle.handle-move {
+    fill: var(--accent);
+    stroke: #ffffff;
+    cursor: move;
+}
+
+.shape-hit {
+    cursor: move;
+    pointer-events: stroke;
+}
+
+.snap-guide {
+    stroke: #ff3fb0;
+    stroke-width: 0.5;
+    stroke-dasharray: 2,1.4;
+    pointer-events: none;
+}
+
+.marquee-rect {
+    fill: rgba(74, 144, 217, 0.15);
+    stroke: #4a90d9;
+    stroke-width: 1;
+    stroke-dasharray: 3,2;
+    pointer-events: none;
+}
+
+.multi-select-outline {
+    fill: none;
+    stroke: #4a90d9;
+    stroke-width: 0.4;
+    stroke-dasharray: 1.2,1;
+    pointer-events: none;
+}
+
+.group-select-outline {
+    fill: none;
+    stroke: #4a90d9;
+    stroke-width: 0.4;
+    pointer-events: none;
+}
+
+.snap-point {
+    fill: #ff3fb0;
+    stroke: #ffffff;
+    stroke-width: 0.3;
+    pointer-events: none;
+}
+
+/* ---- Editor page: hard-cap the page to the viewport --------------------- */
+/* The flex/grid min-height:0 chain above should in theory let the canvas's
+   own overflow:auto do the scrolling, but a zoomed-in SVG's large intrinsic
+   size still ends up growing the page in some browsers. A hard viewport cap
+   + overflow:hidden on the shell is a guaranteed backstop: nothing inside
+   can push the page taller no matter how the inner sizing plays out. Scoped
+   to .editor-page (editor.html only) so it can't affect any other tool that
+   shares this stylesheet or PnPCut's own non-editor pages. */
+
+.editor-page {
+    height: 100vh;
+    overflow: hidden;
+}
+
+.editor-page .container {
+    height: 100vh;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/* ---- Canvas stage: layout, zoom/pan chrome ------------------------------ */
+
+.canvas-stage {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.canvas-body {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    gap: 10px;
+}
+
+.canvas-body .canvas-wrap {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+}
+
+.canvas-wrap.pan-ready,
+.canvas-wrap.pan-ready #canvasSvg {
+    cursor: grab;
+}
+
+.canvas-wrap.panning,
+.canvas-wrap.panning #canvasSvg {
+    cursor: grabbing !important;
+}
+
+.canvas-toolbar {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 5;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: 0 4px 16px var(--shadow);
+}
+
+.zoom-btn {
+    min-width: 26px;
+    height: 26px;
+    padding: 0 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.zoom-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent-hover);
+}
+
+.zoom-btn-wide {
+    font-size: 11px;
+}
+
+.zoom-level {
+    min-width: 42px;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dim);
+}
+
+.zoom-sep {
+    width: 1px;
+    height: 18px;
+    background: var(--border);
+    margin: 0 2px;
+}
+
+/* ---- Properties / history panel ------------------------------------------ */
+
+.props-empty {
+    font-size: 13px;
+    color: var(--text-dim);
+}
+
+.btn-secondary.danger {
+    color: var(--danger);
+    border-color: var(--danger);
+}
+
+.history-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+/* ---- Sheet assembler: project list & cell assignment ---------------------- */
+
+.project-list,
+.cell-assignment {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+.project-row,
+.cell-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 8px;
+}
+
+.project-name {
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+}
+
+.project-size {
+    color: var(--text-dim);
+    flex: 0 0 auto;
+    font-size: 11px;
+}
+
+.project-row.mismatch .project-size {
+    color: var(--danger);
+}
+
+.remove-btn {
+    border: none;
+    background: none;
+    color: var(--text-dim);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 2px;
+}
+
+.remove-btn:hover {
+    color: var(--danger);
+}
+
+.cell-label {
+    flex: 0 0 auto;
+    width: 66px;
+    color: var(--text-dim);
+    font-size: 11px;
+}
+
+.cell-row select {
+    flex: 1 1 auto;
+    padding: 4px 6px;
+    font-size: 12px;
+}
+
+.fill-all-row {
+    display: flex;
+    gap: 6px;
+}
+
+.fill-all-row select {
+    flex: 1 1 auto;
+}
+
+.fill-all-row button {
+    flex: 0 0 auto;
+}

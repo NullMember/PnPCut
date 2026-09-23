@@ -33,6 +33,8 @@
     exportCutBtn: $('exportCutBtn'),
     exportScoreBtn: $('exportScoreBtn'),
     exportEmbossBtn: $('exportEmbossBtn'),
+    cutOffsetX: $('cutOffsetX'),
+    cutOffsetY: $('cutOffsetY'),
   };
 
   const PAPER_PRESETS = {
@@ -185,9 +187,11 @@
   function buildExportSVG(layout, layers, mirror) {
     const guideRect = `<rect x="0" y="0" width="${round(layout.guideW)}" height="${round(layout.guideH)}" fill="none" stroke="${GUIDE_COLOR}" stroke-width="0.1"/>\n`;
     const body = buildBodyMarkup(layout, layers);
-    const content = mirror
-      ? `${guideRect}<g transform="translate(${round(layout.guideW)},0) scale(-1,1)">\n${body}</g>`
-      : guideRect + body;
+    const mirrored = mirror
+      ? `<g transform="translate(${round(layout.guideW)},0) scale(-1,1)">\n${body}</g>`
+      : body;
+    // Registration correction moves every line relative to the guide frame.
+    const content = `${guideRect}<g transform="translate(${round(num(els.cutOffsetX))},${round(num(els.cutOffsetY))})">\n${mirrored}\n</g>`;
     return `<svg xmlns="${SVG_NS}" width="${round(layout.guideW)}mm" height="${round(layout.guideH)}mm" viewBox="0 0 ${round(layout.guideW)} ${round(layout.guideH)}">\n${content}</svg>`;
   }
 
@@ -374,4 +378,22 @@
 
   applyPaperPreset();
   render();
+
+  // ---------- Shared PnPTools wiring ----------
+
+  PnP.bindPreset($('cardPreset'), els.cardW, els.cardH, 'card');
+  PnP.init({
+    tool: 'PnPCut',
+    settingsKey: 'PnPCut-grid', // shared with the grid tool
+    project: {
+      fileName: () => 'PnPCut-sheet',
+      getState: () => ({ projects: state.projects, assignments: state.assignments }),
+      setState: (saved) => {
+        state.projects = (saved && saved.projects) || {};
+        state.assignments = (saved && saved.assignments) || {};
+        render();
+      },
+    },
+    hasUnsavedWork: () => Object.keys(state.projects).length > 0,
+  });
 })();

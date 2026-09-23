@@ -5,6 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sheet Assembler</title>
 <link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/tool.css">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="shared/icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#1a1d27">
+<script src="shared/pnp-theme.js"></script>
+<link rel="stylesheet" href="shared/pnp-shared.css">
 </head>
 <body>
 <div class="container">
@@ -25,16 +31,20 @@
       <div class="panel">
         <div class="panel-title">Card</div>
         <div class="control-group">
+          <label for="cardPreset">Preset</label>
+          <select id="cardPreset"></select>
+        </div>
+        <div class="control-group">
           <label for="cardW">Width (mm)</label>
-          <input type="number" id="cardW" value="63" min="1" step="0.1" required>
+          <input type="number" id="cardW" data-unit="mm" value="63" min="1" step="0.1" required>
         </div>
         <div class="control-group">
           <label for="cardH">Height (mm)</label>
-          <input type="number" id="cardH" value="88" min="1" step="0.1" required>
+          <input type="number" id="cardH" data-unit="mm" value="88" min="1" step="0.1" required>
         </div>
         <div class="control-group">
           <label for="radius">Corner radius (mm)</label>
-          <input type="number" id="radius" value="3" min="0" step="0.1" required>
+          <input type="number" id="radius" data-unit="mm" value="3" min="0" step="0.1" required>
         </div>
       </div>
 
@@ -42,15 +52,15 @@
         <div class="panel-title">Bleed &amp; Spacing</div>
         <div class="control-group">
           <label for="bleed">Bleed per card (mm)</label>
-          <input type="number" id="bleed" value="2" min="0" step="0.1" required>
+          <input type="number" id="bleed" data-unit="mm" value="2" min="0" step="0.1" required>
         </div>
         <div class="control-group">
           <label for="gap">Gap between cards (mm)</label>
-          <input type="number" id="gap" value="4" min="0" step="0.1" required>
+          <input type="number" id="gap" data-unit="mm" value="4" min="0" step="0.1" required>
         </div>
         <div class="control-group">
           <label for="edgeMargin">Gap from guide edge to nearest card (mm)</label>
-          <input type="number" id="edgeMargin" value="2" min="0" step="0.1" required>
+          <input type="number" id="edgeMargin" data-unit="mm" value="2" min="0" step="0.1" required>
         </div>
       </div>
 
@@ -67,11 +77,11 @@
         <div class="row">
           <div class="control-group">
             <label for="paperW">Width (mm)</label>
-            <input type="number" id="paperW" value="210" min="1" step="0.1" required>
+            <input type="number" id="paperW" data-unit="mm" value="210" min="1" step="0.1" required>
           </div>
           <div class="control-group">
             <label for="paperH">Height (mm)</label>
-            <input type="number" id="paperH" value="297" min="1" step="0.1" required>
+            <input type="number" id="paperH" data-unit="mm" value="297" min="1" step="0.1" required>
           </div>
         </div>
         <div class="control-group">
@@ -83,7 +93,7 @@
         <div class="panel-title">Cricut Machine</div>
         <div class="control-group">
           <label for="machineMargin">Mat dead margin (mm)</label>
-          <input type="number" id="machineMargin" value="6.35" min="0" step="0.1" required>
+          <input type="number" id="machineMargin" data-unit="mm" value="6.35" min="0" step="0.1" required>
         </div>
       </div>
 
@@ -100,6 +110,20 @@
           <div class="control-group">
             <label for="rowsInput">Rows</label>
             <input type="number" id="rowsInput" value="1" min="1" step="1" required disabled>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Cut Registration <span class="help" tabindex="0" data-tip="If your machine cuts slightly off the print, move all cut, score and emboss lines by this amount (+ is right / down). Measure it with the registration test sheet.">?</span></div>
+        <div class="row">
+          <div class="control-group">
+            <label for="cutOffsetX">Move cuts X (mm)</label>
+            <input type="number" id="cutOffsetX" value="0" step="0.1" data-unit="mm">
+          </div>
+          <div class="control-group">
+            <label for="cutOffsetY">Move cuts Y (mm)</label>
+            <input type="number" id="cutOffsetY" value="0" step="0.1" data-unit="mm">
           </div>
         </div>
       </div>
@@ -147,6 +171,7 @@
   </div>
 
 </div>
+<script src="shared/pnp-shared.js"></script>
 <script src="js/grid-math.js"></script>
 <script src="js/sheet.js"></script>
 </body>

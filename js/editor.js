@@ -1492,4 +1492,62 @@
   updateCursor();
   fullRender();
   pushHistory();
+
+  // ---------- templates ----------
+
+  // Starting shapes sized to the current card; added as normal, editable shapes.
+  const TEMPLATES = {
+    outline: (W, H) => [{ type: 'rect', layer: 'cut', x: 0, y: 0, w: W, h: H, radius: 3 }],
+    round: (W, H) => {
+      const d = Math.min(W, H);
+      return [{ type: 'ellipse', layer: 'cut', x: (W - d) / 2, y: (H - d) / 2, w: d, h: d }];
+    },
+    hex: (W, H) => {
+      // Pointy-top regular hexagon, as large as fits the card
+      const R = Math.min(W / Math.sqrt(3), H / 2);
+      const w = Math.sqrt(3) * R, h = 2 * R;
+      const points = [];
+      for (let i = 0; i < 6; i++) {
+        const a = ((-90 + 60 * i) * Math.PI) / 180;
+        points.push({ fx: 0.5 + (R * Math.cos(a)) / w, fy: 0.5 + (R * Math.sin(a)) / h });
+      }
+      return [{ type: 'polygon', layer: 'cut', x: (W - w) / 2, y: (H - h) / 2, w, h, points }];
+    },
+    foldMiddle: (W, H) => [{ type: 'line', layer: 'score', x: W / 2, y: 0, w: 0, h: H, diag: 'tlbr' }],
+    standee: (W, H) => {
+      const base = Math.min(15, H * 0.2);
+      return [
+        { type: 'rect', layer: 'cut', x: 0, y: 0, w: W, h: H, radius: 0 },
+        { type: 'line', layer: 'score', x: 0, y: H - base, w: W, h: 0, diag: 'tlbr' },
+      ];
+    },
+  };
+
+  $('addTemplateBtn').addEventListener('click', () => {
+    const make = TEMPLATES[$('templateSelect').value];
+    if (!make) return;
+    const ids = make(state.cardW, state.cardH).map((shape) => {
+      const full = { rotation: 0, radius: 0, diag: 'tlbr', ...shape, id: state.nextId++ };
+      state.shapes.push(full);
+      return full.id;
+    });
+    selectShapes(ids);
+    fullRender();
+    pushHistory();
+  });
+
+  // ---------- Shared PnPTools wiring ----------
+
+  // The editor keeps its own .json project format (the sheet assembler reads
+  // it), so only the top bar, settings, presets and the leave warning are shared.
+  let savedShapes = JSON.stringify(state.shapes);
+  els.saveProjectBtn.addEventListener('click', () => { savedShapes = JSON.stringify(state.shapes); });
+  els.loadProjectInput.addEventListener('change', () => setTimeout(() => { savedShapes = JSON.stringify(state.shapes); }, 500));
+
+  PnP.bindPreset($('cardPreset'), els.cardW, els.cardH, 'card');
+  PnP.init({
+    tool: 'PnPCut',
+    settingsKey: 'PnPCut-editor',
+    hasUnsavedWork: () => state.shapes.length > 0 && JSON.stringify(state.shapes) !== savedShapes,
+  });
 })();
