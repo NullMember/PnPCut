@@ -55,8 +55,9 @@
     return Number.isFinite(v) ? v : 0;
   }
 
+  // Numbers are rounded; text attributes (polygon points, path data) pass through.
   function round(n) {
-    return Math.round(n * 1000) / 1000;
+    return typeof n === 'number' ? Math.round(n * 1000) / 1000 : n;
   }
 
   function cellKey(cell) {
@@ -121,6 +122,17 @@
     if (shape.type === 'polygon') {
       const points = shape.points.map((p) => `${p.fx * shape.w},${p.fy * shape.h}`).join(' ');
       return { transform, tag: 'polygon', attrs: { points } };
+    }
+    if (shape.type === 'path') {
+      // Nodes are fractions of the shape's box (see the card editor).
+      const f = (p) => ({ x: p.fx * shape.w, y: p.fy * shape.h });
+      const nodes = shape.nodes.map((n) => {
+        const o = f(n);
+        if (n.hi) o.hi = f(n.hi);
+        if (n.ho) o.ho = f(n.ho);
+        return o;
+      });
+      return { transform, tag: 'path', attrs: { d: PathGeom.toD({ nodes, closed: !!shape.closed }) } };
     }
     return null;
   }

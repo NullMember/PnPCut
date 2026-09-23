@@ -11,6 +11,7 @@
 <meta name="theme-color" content="#1a1d27">
 <script src="shared/pnp-theme.js"></script>
 <link rel="stylesheet" href="shared/pnp-shared.css">
+<link rel="stylesheet" href="shared/pnp-editor.css">
 </head>
 <body class="editor-page">
 <div class="container">
@@ -53,10 +54,8 @@
 
       <div class="panel">
         <div class="panel-title">Canvas</div>
-        <div class="control-group">
-          <label class="inline"><input type="checkbox" id="snapToggle" checked> Snap to shapes / card edges</label>
-        </div>
-        <div class="input-hint">Tool: left of canvas &middot; Layer: top of canvas &middot; click-drag empty canvas to box-select, shift-click to add/remove &middot; scroll to pan &middot; Ctrl/Cmd+scroll or pinch to zoom &middot; hold Space or middle-click drag to pan &middot; hold Alt while dragging to disable snapping.</div>
+        <div class="input-hint">Tools: V select, A nodes, L line, R rect, E ellipse, P pen, F freehand, T trace; Esc returns to Select &middot; drawing tools stay active &middot; G grid, S snapping, Ctrl/Cmd while dragging bypasses snapping &middot; drag from a ruler to add a guide, drag it back to remove &middot; scroll to pan, Ctrl/Cmd+scroll to zoom, Space-drag to pan.</div>
+        <div id="editorOptions" class="editor-options"></div>
       </div>
 
       <div class="panel">
@@ -100,103 +99,25 @@
     </div>
 
     <div class="main">
-      <div class="canvas-stage">
-        <div class="canvas-topbar">
-          <span class="canvas-topbar-label">Layer</span>
-          <div class="layer-bar" id="layerBar">
-            <div class="layer-row" data-layer="cut">
-              <input type="checkbox" data-vis="cut" checked title="Show Cut layer">
-              <input type="color" class="layer-color" data-layer="cut" value="#c0392b" title="Cut line color">
-              <button type="button" class="layer-btn active" data-layer="cut">Cut</button>
-            </div>
-            <div class="layer-row" data-layer="score">
-              <input type="checkbox" data-vis="score" checked title="Show Score/Fold layer">
-              <input type="color" class="layer-color" data-layer="score" value="#e08e0b" title="Score/Fold line color">
-              <button type="button" class="layer-btn" data-layer="score">Score/Fold</button>
-            </div>
-            <div class="layer-row" data-layer="emboss">
-              <input type="checkbox" data-vis="emboss" checked title="Show Emboss layer">
-              <input type="color" class="layer-color" data-layer="emboss" value="#2e8b57" title="Emboss line color">
-              <button type="button" class="layer-btn" data-layer="emboss">Emboss</button>
-            </div>
-          </div>
-        </div>
-        <div class="canvas-body">
-          <div class="canvas-toolbar-left" id="toolButtons">
-            <button type="button" data-tool="select" class="tool-btn active" title="Select / Move (click-drag empty canvas to box-select)">Select</button>
-            <button type="button" data-tool="line" class="tool-btn" title="Line">Line</button>
-            <button type="button" data-tool="rect" class="tool-btn" title="Rectangle">Rect</button>
-            <button type="button" data-tool="ellipse" class="tool-btn" title="Ellipse">Ellipse</button>
-            <button type="button" data-tool="polygon" class="tool-btn" title="Polygon / lasso">Polygon</button>
-          </div>
-          <div class="canvas-wrap" id="canvasWrap"></div>
-          <div class="canvas-toolbar">
-            <button type="button" id="zoomOutBtn" class="zoom-btn" title="Zoom out (Ctrl/Cmd -)">&minus;</button>
-            <span id="zoomLevel" class="zoom-level">100%</span>
-            <button type="button" id="zoomInBtn" class="zoom-btn" title="Zoom in (Ctrl/Cmd +)">+</button>
-            <span class="zoom-sep"></span>
-            <button type="button" id="zoomResetBtn" class="zoom-btn zoom-btn-wide" title="Zoom to 100% (Ctrl/Cmd 0)">100%</button>
-            <button type="button" id="zoomFitBtn" class="zoom-btn zoom-btn-wide" title="Fit to screen (Shift 1)">Fit</button>
-          </div>
-        </div>
-      </div>
+      <div id="editorStage" class="editor-stage"></div>
     </div>
 
     <div class="gallery-sidebar">
       <div class="panel">
         <div class="panel-title">Properties</div>
-        <div id="propsEmpty" class="props-empty">No shape selected.</div>
-        <div id="propsForm" class="props-form" hidden>
-          <div class="control-group">
-            <label for="propLayer">Layer</label>
-            <select id="propLayer">
-              <option value="cut">Cut</option>
-              <option value="score">Score/Fold</option>
-              <option value="emboss">Emboss</option>
-            </select>
-          </div>
-          <div class="control-group" id="propXWrap">
-            <label for="propX">X (mm)</label>
-            <input type="number" id="propX" data-unit="mm" step="0.1">
-          </div>
-          <div class="control-group" id="propYWrap">
-            <label for="propY">Y (mm)</label>
-            <input type="number" id="propY" data-unit="mm" step="0.1">
-          </div>
-          <div class="control-group" id="propWWrap">
-            <label for="propW">Width (mm)</label>
-            <input type="number" id="propW" data-unit="mm" step="0.1">
-          </div>
-          <div class="control-group" id="propHWrap">
-            <label for="propH">Height (mm)</label>
-            <input type="number" id="propH" data-unit="mm" step="0.1">
-          </div>
-          <div class="control-group" id="propRadiusWrap" hidden>
-            <label for="propRadius">Corner radius (mm)</label>
-            <input type="number" id="propRadius" data-unit="mm" step="0.1" min="0">
-          </div>
-          <div class="control-group" id="propRotWrap">
-            <label for="propRot">Rotation (deg)</label>
-            <input type="number" id="propRot" step="1">
-          </div>
-          <div class="button-group">
-            <button type="button" id="deleteShapeBtn" class="btn-secondary danger">Delete shape</button>
-          </div>
-        </div>
-
-        <div class="history-buttons">
-          <button type="button" id="undoBtn" class="btn-secondary" title="Ctrl/Cmd+Z">Undo</button>
-          <button type="button" id="redoBtn" class="btn-secondary" title="Ctrl/Cmd+Shift+Z">Redo</button>
-        </div>
-
-        <p class="input-hint">Delete = remove selected shape &middot; Arrow keys = nudge 0.1mm (1mm with shift) &middot; Ctrl/Cmd+A select all, +C copy, +X cut, +V paste &middot; Reference image is never exported.</p>
+        <div id="editorProps"></div>
+        <p class="input-hint">Reference image is never exported.</p>
       </div>
     </div>
 
   </div>
 
 </div>
+
 <script src="shared/pnp-shared.js"></script>
+<script src="shared/pathgeom.js"></script>
+<script src="shared/raster.js"></script>
+<script src="shared/pnp-editor.js"></script>
 <script src="js/editor.js"></script>
 </body>
 </html>
