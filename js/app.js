@@ -84,15 +84,15 @@
 
     const ox = num(els.cutOffsetX);
     const oy = num(els.cutOffsetY);
+    // The registration offset is baked into the coordinates: Cricut Design
+    // Space mis-scales anything under a transform attribute.
     const cardRects = cards.map(({ x, y }) =>
-      `  <rect x="${fmt(x)}" y="${fmt(y)}" width="${fmt(cardW)}" height="${fmt(cardH)}" rx="${fmt(radius)}" ry="${fmt(radius)}" fill="none" stroke="#c0392b" stroke-width="0.1"/>`
+      `  <rect x="${fmt(x + ox)}" y="${fmt(y + oy)}" width="${fmt(cardW)}" height="${fmt(cardH)}" rx="${fmt(radius)}" ry="${fmt(radius)}" fill="none" stroke="#c0392b" stroke-width="0.1"/>`
     ).join('\n');
 
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${fmt(guideW)}mm" height="${fmt(guideH)}mm" viewBox="0 0 ${fmt(guideW)} ${fmt(guideH)}">
   <rect x="0" y="0" width="${fmt(guideW)}" height="${fmt(guideH)}" fill="none" stroke="#2b6cb0" stroke-width="0.1"/>
-  <g transform="translate(${fmt(ox)},${fmt(oy)})">
 ${cardRects}
-  </g>
 </svg>`;
   }
 
@@ -227,6 +227,7 @@ ${cut}  </g>
   // The grid tool and the sheet assembler share one settings scope, so the
   // same card/paper/grid is used on both pages.
   PnP.bindPreset($('cardPreset'), els.cardW, els.cardH, 'card');
+  PnP.bindMachinePreset($('machinePreset'), els.machineMargin);
   PnP.init({
     tool: 'PnPCut',
     settingsKey: 'PnPCut-grid',

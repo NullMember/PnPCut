@@ -90,10 +90,14 @@
       </div>
 
       <div class="panel">
-        <div class="panel-title">Cricut Machine</div>
+        <div class="panel-title">Cutting Machine <span class="help" tabindex="0" data-tip="The strip around the mat your machine can't cut into. Cricut's is 0.25&Prime; (6.35 mm); pick Custom and type your machine's value otherwise. The SVG is sized to the paper minus this margin and outlined by a guide rectangle for lining the cut up with the print.">?</span></div>
+        <div class="control-group">
+          <label for="machinePreset">Machine</label>
+          <select id="machinePreset"></select>
+        </div>
         <div class="control-group">
           <label for="machineMargin">Mat dead margin (mm)</label>
-          <input type="number" id="machineMargin" data-unit="mm" value="6.35" min="0" step="0.1" required>
+          <input type="number" id="machineMargin" data-unit="mm" value="6.35" min="0" step="0.01" required>
         </div>
       </div>
 

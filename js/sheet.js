@@ -103,51 +103,25 @@
     return { ...layout, radius: num(els.radius) };
   }
 
-  // ---------- shape markup (mirrors editor.js's describeShape/shapeMarkup) ----------
+  // ---------- shape markup ----------
 
-  function describeShape(shape) {
-    const transform = `translate(${shape.x} ${shape.y}) rotate(${shape.rotation} ${shape.w / 2} ${shape.h / 2})`;
-    if (shape.type === 'rect') {
-      const r = Math.max(0, Math.min(shape.radius || 0, shape.w / 2, shape.h / 2));
-      return { transform, tag: 'rect', attrs: { x: 0, y: 0, width: shape.w, height: shape.h, rx: r, ry: r } };
-    }
-    if (shape.type === 'ellipse') {
-      return { transform, tag: 'ellipse', attrs: { cx: shape.w / 2, cy: shape.h / 2, rx: shape.w / 2, ry: shape.h / 2 } };
-    }
-    if (shape.type === 'line') {
-      const p1 = shape.diag === 'tlbr' ? { x: 0, y: 0 } : { x: shape.w, y: 0 };
-      const p2 = shape.diag === 'tlbr' ? { x: shape.w, y: shape.h } : { x: 0, y: shape.h };
-      return { transform, tag: 'line', attrs: { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y } };
-    }
-    if (shape.type === 'polygon') {
-      const points = shape.points.map((p) => `${p.fx * shape.w},${p.fy * shape.h}`).join(' ');
-      return { transform, tag: 'polygon', attrs: { points } };
-    }
-    if (shape.type === 'path') {
-      // Nodes are fractions of the shape's box (see the card editor).
-      const f = (p) => ({ x: p.fx * shape.w, y: p.fy * shape.h });
-      const nodes = shape.nodes.map((n) => {
-        const o = f(n);
-        if (n.hi) o.hi = f(n.hi);
-        if (n.ho) o.ho = f(n.ho);
-        return o;
-      });
-      return { transform, tag: 'path', attrs: { d: PathGeom.toD({ nodes, closed: !!shape.closed }) } };
-    }
-    return null;
-  }
-
-  function shapeMarkup(shape, layerColors) {
-    const d = describeShape(shape);
-    if (!d) return '';
-    const attrs = Object.entries(d.attrs).map(([k, v]) => `${k}="${round(v)}"`).join(' ');
+  // Shapes become flat paths with position, rotation, mirroring and the
+  // registration offset baked in (`place` maps sheet mm to file coordinates):
+  // Cricut Design Space mis-scales anything under a transform attribute.
+  function shapeMarkup(shape, layerColors, place) {
+    const path = PathGeom.shapePath(shape);
+    if (!path) return '';
+    const d = PathGeom.toD(PathGeom.mapPath(path, place), round);
     const color = (layerColors && layerColors[shape.layer]) || LAYER_COLORS[shape.layer];
-    return `<g transform="${d.transform}"><${d.tag} ${attrs} fill="none" stroke="${color}" stroke-width="0.15"/></g>`;
+    return `<path d="${d}" fill="none" stroke="${color}" stroke-width="0.15"/>`;
   }
 
-  function cutRectMarkup(cell, cardW, cardH, radius) {
+  function cutRectMarkup(cell, cardW, cardH, radius, place) {
     const r = Math.max(0, Math.min(radius, cardW / 2, cardH / 2));
-    return `<rect x="${round(cell.x)}" y="${round(cell.y)}" width="${round(cardW)}" height="${round(cardH)}" rx="${round(r)}" ry="${round(r)}" fill="none" stroke="${LAYER_COLORS.cut}" stroke-width="0.1"/>`;
+    // Place both corners: mirroring swaps which one is on the left.
+    const a = place({ x: cell.x, y: cell.y });
+    const b = place({ x: cell.x + cardW, y: cell.y + cardH });
+    return `<rect x="${round(Math.min(a.x, b.x))}" y="${round(Math.min(a.y, b.y))}" width="${round(cardW)}" height="${round(cardH)}" rx="${round(r)}" ry="${round(r)}" fill="none" stroke="${LAYER_COLORS.cut}" stroke-width="0.1"/>`;
   }
 
   // ---------- sheet body assembly ----------
@@ -171,11 +145,11 @@
     return scaled;
   }
 
-  function buildBodyMarkup(layout, layers) {
+  function buildBodyMarkup(layout, layers, place = (p) => p) {
     let content = '';
     layout.cards.forEach((cell) => {
       if (layers.includes('cut')) {
-        content += cutRectMarkup(cell, layout.cardW, layout.cardH, layout.radius) + '\n';
+        content += cutRectMarkup(cell, layout.cardW, layout.cardH, layout.radius, place) + '\n';
       }
       if (layers.includes('score') || layers.includes('emboss')) {
         const filename = state.assignments[cellKey(cell)];
@@ -188,7 +162,7 @@
             .forEach((s) => {
               const scaled = scaleShapeToCard(s, sx, sy);
               const shifted = { ...scaled, x: scaled.x + cell.x, y: scaled.y + cell.y };
-              content += shapeMarkup(shifted, project.layerColors) + '\n';
+              content += shapeMarkup(shifted, project.layerColors, place) + '\n';
             });
         }
       }
@@ -198,13 +172,11 @@
 
   function buildExportSVG(layout, layers, mirror) {
     const guideRect = `<rect x="0" y="0" width="${round(layout.guideW)}" height="${round(layout.guideH)}" fill="none" stroke="${GUIDE_COLOR}" stroke-width="0.1"/>\n`;
-    const body = buildBodyMarkup(layout, layers);
-    const mirrored = mirror
-      ? `<g transform="translate(${round(layout.guideW)},0) scale(-1,1)">\n${body}</g>`
-      : body;
     // Registration correction moves every line relative to the guide frame.
-    const content = `${guideRect}<g transform="translate(${round(num(els.cutOffsetX))},${round(num(els.cutOffsetY))})">\n${mirrored}\n</g>`;
-    return `<svg xmlns="${SVG_NS}" width="${round(layout.guideW)}mm" height="${round(layout.guideH)}mm" viewBox="0 0 ${round(layout.guideW)} ${round(layout.guideH)}">\n${content}</svg>`;
+    const ox = num(els.cutOffsetX), oy = num(els.cutOffsetY);
+    const place = ({ x, y }) => ({ x: (mirror ? layout.guideW - x : x) + ox, y: y + oy });
+    const body = buildBodyMarkup(layout, layers, place);
+    return `<svg xmlns="${SVG_NS}" width="${round(layout.guideW)}mm" height="${round(layout.guideH)}mm" viewBox="0 0 ${round(layout.guideW)} ${round(layout.guideH)}">\n${guideRect}${body}</svg>`;
   }
 
   // ---------- rendering ----------
@@ -394,6 +366,7 @@
   // ---------- Shared PnPTools wiring ----------
 
   PnP.bindPreset($('cardPreset'), els.cardW, els.cardH, 'card');
+  PnP.bindMachinePreset($('machinePreset'), els.machineMargin);
   PnP.init({
     tool: 'PnPCut',
     settingsKey: 'PnPCut-grid', // shared with the grid tool
