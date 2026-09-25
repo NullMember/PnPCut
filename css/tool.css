@@ -47,6 +47,13 @@
     box-shadow: 0 4px 24px var(--shadow);
 }
 
+/* On screen only: the files keep their hairline (mm) strokes for the
+   cutting machine, which would render well under a pixel wide here. */
+.svg-wrap svg [stroke] {
+    vector-effect: non-scaling-stroke;
+    stroke-width: 1.5px;
+}
+
 /* ---- Sheet assembler: project list & cell assignment ---------------------- */
 
 .project-list,
@@ -126,4 +133,134 @@
 
 .fill-all-row button {
     flex: 0 0 auto;
+}
+
+/* ---- Card editor: card list ------------------------------------------------ */
+
+.button-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 10px 0;
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+.card-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding-right: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.card-item:hover,
+.card-item.dragover {
+    border-color: var(--accent);
+    background: var(--surface2);
+}
+
+.card-item.current {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.card-select {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 36px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    column-gap: 10px;
+    align-items: center;
+    padding: 6px 8px;
+    text-align: left;
+    background: none;
+    border: none;
+    color: var(--text);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.card-actions {
+    display: flex;
+    gap: 2px;
+    flex: none;
+}
+
+.card-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    color: var(--text-dim);
+    cursor: pointer;
+}
+
+.card-action:hover {
+    color: var(--accent);
+    border-color: var(--border);
+}
+
+.card-action.card-eye {
+    color: var(--accent);
+}
+
+.card-action.danger:hover {
+    color: var(--danger);
+}
+
+.card-thumb {
+    grid-row: span 2;
+    width: 36px;
+    height: 44px;
+    background: #fff;
+    border-radius: 3px;
+}
+
+.card-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.card-count {
+    color: var(--text-dim);
+    font-size: 11px;
+}
+
+/* ---- Sheet assembler: pages ------------------------------------------------ */
+
+.page-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.page-label {
+    flex: 1;
+    text-align: center;
+    font-size: 13px;
+}
+
+.project-cards {
+    color: var(--text-dim);
+    flex: 0 0 auto;
+    font-size: 11px;
 }

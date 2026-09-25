@@ -17,7 +17,7 @@
 
   <header>
     <h1>Sheet Assembler</h1>
-    <p class="subtitle">Combine per-card Score-Fold/Emboss designs from the card editor into one full-sheet SVG, aligned to the grid tool's cell positions. Cut stays the uniform card outline.</p>
+    <p class="subtitle">Combine cards from card editor projects into full-sheet SVGs, one per page, aligned to the grid tool's cell positions.</p>
     <nav class="tool-nav">
       <a class="nav-link" href="index.html">&larr; Grid tool</a>
       <a class="nav-link" href="editor.html">&larr; Card editor</a>
@@ -44,7 +44,19 @@
             <input type="number" id="cardH" data-unit="mm" value="88" min="1" step="0.1" required>
           </div>
         </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Outline Cut <span class="help" tabindex="0" data-tip="The cut around each card. Cut lines drawn in a card project (its Cut layer) are always included; they can stand in for the rectangle, for die-cut shapes like tokens or standees.">?</span></div>
         <div class="control-group">
+          <label for="outlineMode">Cut around each card</label>
+          <select id="outlineMode">
+            <option value="auto">Card's own Cut lines, else a rounded rectangle</option>
+            <option value="rect">Rounded rectangle on every card</option>
+            <option value="none">No outline (only the cards' own Cut lines)</option>
+          </select>
+        </div>
+        <div class="control-group" id="radiusGroup">
           <label for="radius">Corner radius (mm)</label>
           <input type="number" id="radius" data-unit="mm" value="3" min="0" step="0.1" required>
         </div>
@@ -143,12 +155,29 @@
 
     <div class="gallery-sidebar">
       <div class="panel">
-        <div class="panel-title">Card Projects <span class="help" tabindex="0" data-tip="Upload the .json project files you saved from the card editor, then assign one to each grid cell below.">?</span></div>
-        <div class="control-group">
-          <label for="projectInput">Upload project .json file(s)</label>
-          <input type="file" id="projectInput" accept="application/json" multiple>
+        <div class="panel-title">Card Projects <span class="help" tabindex="0" data-tip="Add the .json project files you saved from the card editor, then assign a card to each grid cell below.">?</span></div>
+        <div class="dropzone dropzone-compact" id="projectDrop">
+          <div class="dz-title">Drop card projects (.json) here</div>
+          <div>or click to browse</div>
+          <input type="file" id="projectInput" accept="application/json,.json" multiple hidden>
         </div>
         <div id="projectList" class="project-list"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Pages</div>
+        <div class="page-nav">
+          <button type="button" id="prevPageBtn" class="btn-secondary btn-small" title="Previous page" aria-label="Previous page">&lsaquo;</button>
+          <span id="pageLabel" class="page-label">Page 1 of 1</span>
+          <button type="button" id="nextPageBtn" class="btn-secondary btn-small" title="Next page" aria-label="Next page">&rsaquo;</button>
+        </div>
+        <div class="button-row">
+          <button type="button" id="addPageBtn" class="btn-secondary btn-small">New page</button>
+          <button type="button" id="dupPageBtn" class="btn-secondary btn-small">Duplicate</button>
+          <button type="button" id="deletePageBtn" class="btn-secondary btn-small">Delete</button>
+        </div>
+        <button type="button" id="placeAllBtn" class="btn-secondary btn-small" hidden>Place every card once</button>
+        <div class="input-hint" id="placeAllHint" hidden>Fills the next empty cells with each card no page uses yet, adding pages as needed.</div>
       </div>
 
       <div class="panel">
@@ -164,6 +193,13 @@
         <div class="panel-title">Export</div>
         <div class="control-group">
           <label class="inline"><input type="checkbox" id="mirrorSheet"> Mirror whole sheet (for back-side pass)</label>
+        </div>
+        <div class="control-group" id="exportPagesGroup" hidden>
+          <label for="exportPages">Pages</label>
+          <select id="exportPages">
+            <option value="all">Every page (.zip, one SVG per page)</option>
+            <option value="current">This page only</option>
+          </select>
         </div>
         <div class="button-group">
           <button type="button" id="exportAllBtn" class="btn-primary">Export all layers</button>

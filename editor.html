@@ -30,7 +30,27 @@
     <div class="sidebar">
 
       <div class="panel">
-        <div class="panel-title">Card</div>
+        <div class="panel-title">Cards <span class="help" tabindex="0" data-tip="A project holds any number of cards of the same size, each with its own reference image and line art. The sheet assembler can place every card from the project. On each card: the eye shows or hides its reference image (never exported; stretched over the card, transparent pixels as a checkerboard), the picture button sets or replaces it, or drop an image on the card.">?</span></div>
+        <div class="dropzone dropzone-compact" id="cardImageDrop">
+          <div class="dz-title">Drop card images here</div>
+          <div>each image becomes a card &middot; or click to browse</div>
+          <input type="file" id="cardImageInput" accept="image/*" multiple hidden>
+        </div>
+        <div id="cardList" class="card-list"></div>
+        <input type="file" id="imageInput" accept="image/*" hidden>
+        <div class="control-group">
+          <label for="cardName">Card name</label>
+          <input type="text" id="cardName" data-persist="false" autocomplete="off">
+        </div>
+        <div class="button-row">
+          <button type="button" id="addCardBtn" class="btn-secondary btn-small">New card</button>
+          <button type="button" id="dupCardBtn" class="btn-secondary btn-small">Duplicate</button>
+          <button type="button" id="deleteCardBtn" class="btn-secondary btn-small danger">Delete</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Card Size <span class="help" tabindex="0" data-tip="Every card in the project has this size.">?</span></div>
         <div class="control-group">
           <label for="cardPreset">Preset</label>
           <select id="cardPreset"></select>
@@ -44,13 +64,6 @@
             <label for="cardH">Height (mm)</label>
             <input type="number" id="cardH" data-unit="mm" value="88" min="1" step="0.1" required>
           </div>
-        </div>
-        <div class="control-group">
-          <label for="imageInput">Reference image</label>
-          <input type="file" id="imageInput" accept="image/*">
-        </div>
-        <div class="control-group">
-          <label class="inline"><input type="checkbox" id="imageVisible" checked> Show reference image</label>
         </div>
       </div>
 
@@ -72,7 +85,11 @@
             <option value="standee">Standee: outline + fold-under base (cut + score)</option>
           </select>
         </div>
-        <button type="button" id="addTemplateBtn" class="btn-secondary btn-small">Add to card</button>
+        <div class="button-row">
+          <button type="button" id="addTemplateBtn" class="btn-secondary btn-small">Add to this card</button>
+          <button type="button" id="addTemplateAllBtn" class="btn-secondary btn-small">Add to every card</button>
+        </div>
+        <div class="input-hint">Cut lines are saved with the card, so the sheet assembler can use them as the card's outline instead of its rounded rectangle.</div>
       </div>
 
       <div class="panel">
@@ -80,9 +97,10 @@
         <div class="button-group">
           <button type="button" id="saveProjectBtn" class="btn-secondary">Save project (.json)</button>
         </div>
-        <div class="control-group">
-          <label for="loadProjectInput">Load project</label>
-          <input type="file" id="loadProjectInput" accept="application/json">
+        <div class="dropzone dropzone-compact" id="projectDrop">
+          <div class="dz-title">Drop a project .json here</div>
+          <div>or click to browse</div>
+          <input type="file" id="loadProjectInput" accept="application/json,.json" hidden>
         </div>
       </div>
 
@@ -96,7 +114,9 @@
           <button type="button" id="exportCutBtn" class="btn-secondary">Export Cut only</button>
           <button type="button" id="exportScoreBtn" class="btn-secondary">Export Score/Fold only</button>
           <button type="button" id="exportEmbossBtn" class="btn-secondary">Export Emboss only</button>
+          <button type="button" id="exportCardsBtn" class="btn-secondary">Export every card (.zip)</button>
         </div>
+        <div class="input-hint">The layer buttons export the card you are editing.</div>
       </div>
     </div>
 

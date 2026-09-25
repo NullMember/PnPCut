@@ -22,7 +22,20 @@
     rowsInput: $('rowsInput'),
     warning: $('warning'),
     canvasWrap: $('canvasWrap'),
+    projectDrop: $('projectDrop'),
     projectInput: $('projectInput'),
+    outlineMode: $('outlineMode'),
+    radiusGroup: $('radiusGroup'),
+    prevPageBtn: $('prevPageBtn'),
+    nextPageBtn: $('nextPageBtn'),
+    pageLabel: $('pageLabel'),
+    addPageBtn: $('addPageBtn'),
+    dupPageBtn: $('dupPageBtn'),
+    deletePageBtn: $('deletePageBtn'),
+    placeAllBtn: $('placeAllBtn'),
+    placeAllHint: $('placeAllHint'),
+    exportPagesGroup: $('exportPagesGroup'),
+    exportPages: $('exportPages'),
     projectList: $('projectList'),
     cellAssignment: $('cellAssignment'),
     fillAllRow: $('fillAllRow'),
@@ -42,9 +55,11 @@
     letter: { w: 215.9, h: 279.4 },
   };
 
+  // Card references are "filename::index" (the index-th card of a project).
   const state = {
-    projects: {},       // filename -> parsed project JSON
-    assignments: {},    // "row-col" -> filename | null
+    projects: {},                   // filename -> { cardW, cardH, layerColors, cards: [{ name, shapes }] }
+    pages: [{ assignments: {} }],   // assignments: "row-col" -> card reference
+    current: 0,                     // page shown and edited
   };
 
   let gapTouched = false;
@@ -62,6 +77,46 @@
 
   function cellKey(cell) {
     return `${cell.row}-${cell.col}`;
+  }
+
+  const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+  const cardRef = (filename, index) => `${filename}::${index}`;
+
+  function resolveRef(ref) {
+    if (!ref) return null;
+    const cut = ref.lastIndexOf('::');
+    const project = state.projects[ref.slice(0, cut)];
+    const card = project && project.cards[+ref.slice(cut + 2)];
+    return card ? { project, card } : null;
+  }
+
+  // Every card of every project, in project order.
+  function allCardRefs() {
+    return Object.keys(state.projects).flatMap((name) => state.projects[name].cards.map((_, i) => cardRef(name, i)));
+  }
+
+  function cardLabel(ref) {
+    const cut = ref.lastIndexOf('::');
+    const name = ref.slice(0, cut);
+    const project = state.projects[name];
+    return project.cards.length > 1 ? `${name} › ${project.cards[+ref.slice(cut + 2)].name}` : name;
+  }
+
+  const page = () => state.pages[state.current];
+
+  // Card editor projects: version 2 lists cards; version 1 is a single card
+  // with its shapes at the top level. Reference images are not needed here.
+  function normalizeProject(data, filename) {
+    const list = Array.isArray(data.cards)
+      ? data.cards
+      : [{ name: filename.replace(/\.[^.]+$/, ''), shapes: data.shapes }];
+    return {
+      cardW: +data.cardW || 0,
+      cardH: +data.cardH || 0,
+      layerColors: data.layerColors || null,
+      cards: list.map((c, i) => ({ name: c.name || `Card ${i + 1}`, shapes: Array.isArray(c.shapes) ? c.shapes : [] })),
+    };
   }
 
   // ---------- grid params (mirrors app.js) ----------
@@ -145,44 +200,47 @@
     return scaled;
   }
 
-  function buildBodyMarkup(layout, layers, place = (p) => p) {
+  // The outline cut is the uniform rounded rectangle, the card's own Cut
+  // lines standing in for it ("auto": when the card has any), or nothing.
+  // A card's own lines on the requested layers are always drawn.
+  function buildBodyMarkup(layout, pg, layers, place = (p) => p) {
+    const mode = els.outlineMode.value;
     let content = '';
     layout.cards.forEach((cell) => {
-      if (layers.includes('cut')) {
+      const found = resolveRef(pg.assignments[cellKey(cell)]);
+      const shapes = found ? found.card.shapes : [];
+      const ownCut = shapes.some((s) => s.layer === 'cut');
+      if (layers.includes('cut') && (mode === 'rect' || (mode === 'auto' && !ownCut))) {
         content += cutRectMarkup(cell, layout.cardW, layout.cardH, layout.radius, place) + '\n';
       }
-      if (layers.includes('score') || layers.includes('emboss')) {
-        const filename = state.assignments[cellKey(cell)];
-        const project = filename ? state.projects[filename] : null;
-        if (project) {
-          const sx = project.cardW ? layout.cardW / project.cardW : 1;
-          const sy = project.cardH ? layout.cardH / project.cardH : 1;
-          project.shapes
-            .filter((s) => layers.includes(s.layer))
-            .forEach((s) => {
-              const scaled = scaleShapeToCard(s, sx, sy);
-              const shifted = { ...scaled, x: scaled.x + cell.x, y: scaled.y + cell.y };
-              content += shapeMarkup(shifted, project.layerColors, place) + '\n';
-            });
-        }
-      }
+      if (!found) return;
+      const { project } = found;
+      const sx = project.cardW ? layout.cardW / project.cardW : 1;
+      const sy = project.cardH ? layout.cardH / project.cardH : 1;
+      shapes
+        .filter((s) => layers.includes(s.layer))
+        .forEach((s) => {
+          const scaled = scaleShapeToCard(s, sx, sy);
+          const shifted = { ...scaled, x: scaled.x + cell.x, y: scaled.y + cell.y };
+          content += shapeMarkup(shifted, project.layerColors, place) + '\n';
+        });
     });
     return content;
   }
 
-  function buildExportSVG(layout, layers, mirror) {
+  function buildExportSVG(layout, pg, layers, mirror) {
     const guideRect = `<rect x="0" y="0" width="${round(layout.guideW)}" height="${round(layout.guideH)}" fill="none" stroke="${GUIDE_COLOR}" stroke-width="0.1"/>\n`;
     // Registration correction moves every line relative to the guide frame.
     const ox = num(els.cutOffsetX), oy = num(els.cutOffsetY);
     const place = ({ x, y }) => ({ x: (mirror ? layout.guideW - x : x) + ox, y: y + oy });
-    const body = buildBodyMarkup(layout, layers, place);
+    const body = buildBodyMarkup(layout, pg, layers, place);
     return `<svg xmlns="${SVG_NS}" width="${round(layout.guideW)}mm" height="${round(layout.guideH)}mm" viewBox="0 0 ${round(layout.guideW)} ${round(layout.guideH)}">\n${guideRect}${body}</svg>`;
   }
 
   // ---------- rendering ----------
 
   function renderCanvas(layout) {
-    const body = buildBodyMarkup(layout, ['cut', 'score', 'emboss']);
+    const body = buildBodyMarkup(layout, page(), ['cut', 'score', 'emboss']);
     const guideRect = `<rect x="0" y="0" width="${round(layout.guideW)}" height="${round(layout.guideH)}" fill="none" stroke="${GUIDE_COLOR}" stroke-width="0.1"/>`;
     els.canvasWrap.innerHTML =
       `<svg xmlns="${SVG_NS}" width="${round(layout.guideW)}mm" height="${round(layout.guideH)}mm" viewBox="0 0 ${round(layout.guideW)} ${round(layout.guideH)}">` +
@@ -207,71 +265,92 @@
     els.projectList.innerHTML = names.map((name) => {
       const p = state.projects[name];
       const mismatch = Math.abs(p.cardW - num(els.cardW)) > 0.5 || Math.abs(p.cardH - num(els.cardH)) > 0.5;
+      const n = p.cards.length;
       return `<div class="project-row${mismatch ? ' mismatch' : ''}">` +
-        `<span class="project-name" title="${name}">${name}</span>` +
+        `<span class="project-name" title="${esc(name)}">${esc(name)}</span>` +
+        `<span class="project-cards">${n} card${n === 1 ? '' : 's'}</span>` +
         `<span class="project-size">${round(p.cardW)}×${round(p.cardH)}mm${mismatch ? ' ⚠' : ''}</span>` +
-        `<button type="button" class="remove-btn" data-remove="${name}">&times;</button>` +
+        `<button type="button" class="remove-btn" data-remove="${esc(name)}" aria-label="Remove ${esc(name)}">&times;</button>` +
         `</div>`;
+    }).join('');
+  }
+
+  // Options for a card picker: one group per multi-card project.
+  function cardOptions(selected) {
+    return Object.keys(state.projects).map((name) => {
+      const p = state.projects[name];
+      const opts = p.cards.map((c, i) => {
+        const ref = cardRef(name, i);
+        const label = p.cards.length > 1 ? c.name : name;
+        return `<option value="${esc(ref)}"${ref === selected ? ' selected' : ''}>${esc(label)}</option>`;
+      }).join('');
+      return p.cards.length > 1 ? `<optgroup label="${esc(name)}">${opts}</optgroup>` : opts;
     }).join('');
   }
 
   function renderCellAssignment(layout) {
-    const names = Object.keys(state.projects);
+    const hasCards = allCardRefs().length > 0;
     els.cellAssignment.innerHTML = layout.cards.map((cell) => {
       const key = cellKey(cell);
-      const current = state.assignments[key] || '';
-      const options = ['<option value="">— none —</option>']
-        .concat(names.map((n) => `<option value="${n}" ${n === current ? 'selected' : ''}>${n}</option>`));
+      const current = page().assignments[key] || '';
       return `<div class="cell-row">` +
         `<span class="cell-label">Cell ${cell.row + 1},${cell.col + 1}</span>` +
-        `<select data-cell="${key}">${options.join('')}</select>` +
+        `<select data-cell="${key}"><option value="">— none —</option>${cardOptions(current)}</select>` +
         `</div>`;
     }).join('');
 
-    els.fillAllRow.hidden = names.length === 0;
-    els.fillAllSelect.innerHTML = names.map((n) => `<option value="${n}">${n}</option>`).join('');
+    els.fillAllRow.hidden = !hasCards;
+    els.fillAllSelect.innerHTML = cardOptions(els.fillAllSelect.value);
   }
 
-  function pruneAssignments() {
-    Object.keys(state.assignments).forEach((key) => {
-      const filename = state.assignments[key];
-      if (filename && !state.projects[filename]) delete state.assignments[key];
+  function renderPages() {
+    const n = state.pages.length;
+    els.pageLabel.textContent = `Page ${state.current + 1} of ${n}`;
+    els.prevPageBtn.disabled = state.current === 0;
+    els.nextPageBtn.disabled = state.current === n - 1;
+    els.deletePageBtn.disabled = n === 1;
+    const hasCards = allCardRefs().length > 0;
+    els.placeAllBtn.hidden = !hasCards;
+    els.placeAllHint.hidden = !hasCards;
+    els.exportPagesGroup.hidden = n === 1;
+    els.radiusGroup.hidden = els.outlineMode.value === 'none';
+  }
+
+  // Forget assignments to cards that no longer exist, and cells the grid lost.
+  function pruneAssignments(layout) {
+    const cells = new Set(layout.cards.map(cellKey));
+    state.pages.forEach((pg) => {
+      Object.keys(pg.assignments).forEach((key) => {
+        if (!cells.has(key) || !resolveRef(pg.assignments[key])) delete pg.assignments[key];
+      });
     });
   }
 
   function render() {
     const layout = computeLayout();
+    pruneAssignments(layout);
     renderWarning(layout);
     renderCanvas(layout);
-    pruneAssignments();
     renderProjectList();
     renderCellAssignment(layout);
+    renderPages();
     return layout;
   }
 
   // ---------- project upload ----------
 
-  els.projectInput.addEventListener('change', () => {
-    const files = [...els.projectInput.files];
-    let remaining = files.length;
-    if (remaining === 0) return;
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        try {
-          state.projects[file.name] = JSON.parse(reader.result);
-        } catch (e) {
-          console.error('Failed to parse project file', file.name, e);
-        }
-        remaining--;
-        if (remaining === 0) {
-          els.projectInput.value = '';
-          render();
-        }
-      };
-      reader.readAsText(file);
-    });
-  });
+  async function addProjects(files) {
+    for (const file of files) {
+      try {
+        state.projects[file.name] = normalizeProject(JSON.parse(await file.text()), file.name);
+      } catch (e) {
+        PnP.toast(`Could not read ${file.name}: ${e.message}`, 'error');
+      }
+    }
+    render();
+  }
+
+  PnP.dropzone(els.projectDrop, { input: els.projectInput, accept: ['application/json', '.json'], onFiles: addProjects });
 
   els.projectList.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-remove]');
@@ -283,19 +362,72 @@
   els.cellAssignment.addEventListener('change', (e) => {
     const select = e.target.closest('select[data-cell]');
     if (!select) return;
-    state.assignments[select.dataset.cell] = select.value || null;
+    if (select.value) page().assignments[select.dataset.cell] = select.value;
+    else delete page().assignments[select.dataset.cell];
     render();
   });
 
   els.fillAllBtn.addEventListener('click', () => {
-    const filename = els.fillAllSelect.value;
-    if (!filename) return;
+    const ref = els.fillAllSelect.value;
+    if (!ref) return;
     const layout = computeLayout();
     layout.cards.forEach((cell) => {
       const key = cellKey(cell);
-      if (!state.assignments[key]) state.assignments[key] = filename;
+      if (!page().assignments[key]) page().assignments[key] = ref;
     });
     render();
+  });
+
+  // ---------- pages ----------
+
+  function showPage(index) {
+    state.current = Math.max(0, Math.min(state.pages.length - 1, index));
+    render();
+  }
+
+  els.prevPageBtn.addEventListener('click', () => showPage(state.current - 1));
+  els.nextPageBtn.addEventListener('click', () => showPage(state.current + 1));
+
+  els.addPageBtn.addEventListener('click', () => {
+    state.pages.splice(state.current + 1, 0, { assignments: {} });
+    showPage(state.current + 1);
+  });
+
+  els.dupPageBtn.addEventListener('click', () => {
+    state.pages.splice(state.current + 1, 0, { assignments: { ...page().assignments } });
+    showPage(state.current + 1);
+  });
+
+  els.deletePageBtn.addEventListener('click', () => {
+    if (state.pages.length === 1) return;
+    state.pages.splice(state.current, 1);
+    showPage(state.current);
+  });
+
+  // Each card no page uses yet goes into the next empty cell, from the first
+  // page on; pages are added until every card has a place.
+  els.placeAllBtn.addEventListener('click', () => {
+    const used = new Set(state.pages.flatMap((pg) => Object.values(pg.assignments)));
+    const todo = allCardRefs().filter((ref) => !used.has(ref));
+    if (!todo.length) {
+      PnP.toast('Every card is already on a page.', 'info');
+      return;
+    }
+    const cells = computeLayout().cards.map(cellKey);
+    let placed = 0;
+    let firstTouched = -1;
+    for (let p = 0; todo.length; p++) {
+      if (!state.pages[p]) state.pages.push({ assignments: {} });
+      const { assignments } = state.pages[p];
+      cells.forEach((key) => {
+        if (!todo.length || assignments[key]) return;
+        assignments[key] = todo.shift();
+        placed++;
+        if (firstTouched === -1) firstTouched = p;
+      });
+    }
+    PnP.toast(`Placed ${placed} card${placed === 1 ? '' : 's'} on ${state.pages.length} page${state.pages.length === 1 ? '' : 's'}.`, 'success');
+    showPage(firstTouched);
   });
 
   // ---------- grid param wiring (mirrors app.js) ----------
@@ -321,42 +453,35 @@
     render();
   });
 
-  ['cardW', 'cardH', 'radius', 'landscape', 'machineMargin', 'cols', 'rowsInput'].forEach((id) => {
+  ['cardW', 'cardH', 'radius', 'outlineMode', 'landscape', 'machineMargin', 'cols', 'rowsInput'].forEach((id) => {
     els[id].addEventListener('input', render);
     els[id].addEventListener('change', render);
   });
 
   // ---------- export ----------
 
-  function downloadSVG(markup, suffix) {
+  // One SVG for the page shown, or a zip with one SVG per page.
+  async function exportLayers(layers, suffix) {
     const layout = computeLayout();
-    const blob = new Blob([markup], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `sheet_${round(layout.cardW)}x${round(layout.cardH)}mm_${layout.cols}x${layout.rows}_${suffix}.svg`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const mirror = els.mirrorSheet.checked;
+    const base = `sheet_${round(layout.cardW)}x${round(layout.cardH)}mm_${layout.cols}x${layout.rows}`;
+    const svgBlob = (markup) => new Blob([markup], { type: 'image/svg+xml' });
+    if (state.pages.length === 1 || els.exportPages.value === 'current') {
+      const pageSuffix = state.pages.length === 1 ? '' : `_p${state.current + 1}`;
+      PnP.downloadBlob(svgBlob(buildExportSVG(layout, page(), layers, mirror)), `${base}${pageSuffix}_${suffix}.svg`);
+      return;
+    }
+    const entries = state.pages.map((pg, i) => ({
+      name: `${base}_p${i + 1}_${suffix}.svg`,
+      data: buildExportSVG(layout, pg, layers, mirror),
+    }));
+    PnP.downloadBlob(await PnP.zip.create(entries), `${base}_${state.pages.length}pages_${suffix}.zip`);
   }
 
-  els.exportAllBtn.addEventListener('click', () => {
-    const layout = computeLayout();
-    downloadSVG(buildExportSVG(layout, ['cut', 'score', 'emboss'], els.mirrorSheet.checked), 'all');
-  });
-  els.exportCutBtn.addEventListener('click', () => {
-    const layout = computeLayout();
-    downloadSVG(buildExportSVG(layout, ['cut'], els.mirrorSheet.checked), 'cut');
-  });
-  els.exportScoreBtn.addEventListener('click', () => {
-    const layout = computeLayout();
-    downloadSVG(buildExportSVG(layout, ['score'], els.mirrorSheet.checked), 'score');
-  });
-  els.exportEmbossBtn.addEventListener('click', () => {
-    const layout = computeLayout();
-    downloadSVG(buildExportSVG(layout, ['emboss'], els.mirrorSheet.checked), 'emboss');
-  });
+  els.exportAllBtn.addEventListener('click', () => exportLayers(['cut', 'score', 'emboss'], 'all'));
+  els.exportCutBtn.addEventListener('click', () => exportLayers(['cut'], 'cut'));
+  els.exportScoreBtn.addEventListener('click', () => exportLayers(['score'], 'score'));
+  els.exportEmbossBtn.addEventListener('click', () => exportLayers(['emboss'], 'emboss'));
 
   // ---------- init ----------
 
@@ -372,10 +497,23 @@
     settingsKey: 'PnPCut-grid', // shared with the grid tool
     project: {
       fileName: () => 'PnPCut-sheet',
-      getState: () => ({ projects: state.projects, assignments: state.assignments }),
+      getState: () => ({ projects: state.projects, pages: state.pages }),
+      // Older saves held raw single-card projects and one page of
+      // assignments naming a project file.
       setState: (saved) => {
-        state.projects = (saved && saved.projects) || {};
-        state.assignments = (saved && saved.assignments) || {};
+        const projects = (saved && saved.projects) || {};
+        state.projects = {};
+        Object.keys(projects).forEach((name) => { state.projects[name] = normalizeProject(projects[name], name); });
+        const pages = (saved && saved.pages) || [{ assignments: (saved && saved.assignments) || {} }];
+        state.pages = pages.map((pg) => {
+          const assignments = {};
+          Object.entries(pg.assignments || {}).forEach(([key, ref]) => {
+            if (ref) assignments[key] = ref.includes('::') ? ref : cardRef(ref, 0);
+          });
+          return { assignments };
+        });
+        if (!state.pages.length) state.pages.push({ assignments: {} });
+        state.current = 0;
         render();
       },
     },
