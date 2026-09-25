@@ -430,6 +430,24 @@
     savedSignature = workSignature();
   }
 
+  // Hand the cards to a new sheet assembler tab (through the same store as
+  // "Send to"); the sheet opens them as a project and places every card.
+  $('openSheetBtn').addEventListener('click', async () => {
+    const win = window.open('', '_blank'); // synchronously, so popup blockers allow it
+    try {
+      const project = projectData();
+      const name = `card-project_${project.cardW}x${project.cardH}mm.json`;
+      const blob = new Blob([JSON.stringify(project)], { type: 'application/json' });
+      const id = await PnP.handoff.save({ name: `${cards.length} card(s) from the card editor`, from: 'Card editor', items: [{ name, blob }] });
+      const url = `sheet.html?import=${encodeURIComponent(id)}`;
+      if (win) win.location.href = url;
+      else location.href = url;
+    } catch (err) {
+      if (win) win.close();
+      PnP.toast(`Could not open the sheet assembler: ${err.message}`, 'error');
+    }
+  });
+
   async function loadProject(file) {
     const project = JSON.parse(await file.text());
     const list = Array.isArray(project.cards)

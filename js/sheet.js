@@ -406,7 +406,7 @@
 
   // Each card no page uses yet goes into the next empty cell, from the first
   // page on; pages are added until every card has a place.
-  els.placeAllBtn.addEventListener('click', () => {
+  function placeEveryCard() {
     const used = new Set(state.pages.flatMap((pg) => Object.values(pg.assignments)));
     const todo = allCardRefs().filter((ref) => !used.has(ref));
     if (!todo.length) {
@@ -428,7 +428,9 @@
     }
     PnP.toast(`Placed ${placed} card${placed === 1 ? '' : 's'} on ${state.pages.length} page${state.pages.length === 1 ? '' : 's'}.`, 'success');
     showPage(firstTouched);
-  });
+  }
+
+  els.placeAllBtn.addEventListener('click', placeEveryCard);
 
   // ---------- grid param wiring (mirrors app.js) ----------
 
@@ -518,5 +520,11 @@
       },
     },
     hasUnsavedWork: () => Object.keys(state.projects).length > 0,
+  });
+
+  // Cards sent from the card editor ("Open in sheet assembler").
+  PnP.handoff.receive(async (items) => {
+    await addProjects(PnP.itemsToFiles(items));
+    placeEveryCard();
   });
 })();
