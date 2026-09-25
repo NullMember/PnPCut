@@ -29,7 +29,7 @@
     <div class="sidebar">
 
       <div class="panel">
-        <div class="panel-title">Card</div>
+        <div class="panel-title">Card <span class="help" tabindex="0" data-tip="Use the same card size as your card projects. A project of a different size is marked ⚠ in the list and its lines are scaled to this size.">?</span></div>
         <div class="control-group">
           <label for="cardPreset">Preset</label>
           <select id="cardPreset"></select>
@@ -63,7 +63,7 @@
       </div>
 
       <div class="panel">
-        <div class="panel-title">Bleed &amp; Spacing</div>
+        <div class="panel-title">Bleed &amp; Spacing <span class="help" tabindex="0" data-tip="Use the same values as in the grid tool, so the cut lines land on the printed cards. Gap and edge margin default to 2× and 1× the bleed amount; edit them once and they stop auto-updating.">?</span></div>
         <div class="control-group">
           <label for="bleed">Bleed per card (mm)</label>
           <input type="number" id="bleed" data-unit="mm" value="2" min="0" step="0.1" required>
@@ -116,7 +116,7 @@
       </div>
 
       <div class="panel">
-        <div class="panel-title">Grid</div>
+        <div class="panel-title">Grid <span class="help" tabindex="0" data-tip="How many cards go across and down. With Auto-fit on, it’s the most that fit inside the guide area at this card size, gap and edge gap; turn it off to set columns and rows yourself (a warning shows if they don’t fit).">?</span></div>
         <div class="control-group">
           <label class="inline"><input type="checkbox" id="autoFit" checked> Auto-fit maximum grid</label>
         </div>
@@ -181,7 +181,7 @@
       </div>
 
       <div class="panel">
-        <div class="panel-title">Cell Assignment</div>
+        <div class="panel-title">Cell Assignment <span class="help" tabindex="0" data-tip="Cells are numbered row, column: Cell 1,1 is the top-left card. Pick a card for each cell on this page; empty cells get just the outline cut, if one is on.">?</span></div>
         <div id="cellAssignment" class="cell-assignment"></div>
         <div class="fill-all-row" id="fillAllRow" hidden>
           <select id="fillAllSelect"></select>
