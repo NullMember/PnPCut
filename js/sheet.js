@@ -234,7 +234,7 @@
     const ox = num(els.cutOffsetX), oy = num(els.cutOffsetY);
     const place = ({ x, y }) => ({ x: (mirror ? layout.guideW - x : x) + ox, y: y + oy });
     const body = buildBodyMarkup(layout, pg, layers, place);
-    return `<svg xmlns="${SVG_NS}" width="${round(layout.guideW)}mm" height="${round(layout.guideH)}mm" viewBox="0 0 ${round(layout.guideW)} ${round(layout.guideH)}">\n${guideRect}${body}</svg>`;
+    return `<svg xmlns="${SVG_NS}" ${PnP.svgSize(layout.guideW, layout.guideH)}>\n${guideRect}${body}</svg>`;
   }
 
   // ---------- rendering ----------
@@ -243,7 +243,7 @@
     const body = buildBodyMarkup(layout, page(), ['cut', 'score', 'emboss']);
     const guideRect = `<rect x="0" y="0" width="${round(layout.guideW)}" height="${round(layout.guideH)}" fill="none" stroke="${GUIDE_COLOR}" stroke-width="0.1"/>`;
     els.canvasWrap.innerHTML =
-      `<svg xmlns="${SVG_NS}" width="${round(layout.guideW)}mm" height="${round(layout.guideH)}mm" viewBox="0 0 ${round(layout.guideW)} ${round(layout.guideH)}">` +
+      `<svg xmlns="${SVG_NS}" ${PnP.svgSize(layout.guideW, layout.guideH)}>` +
       guideRect + body + `</svg>`;
   }
 

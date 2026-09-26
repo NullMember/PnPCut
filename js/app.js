@@ -90,7 +90,7 @@
       `  <rect x="${fmt(x + ox)}" y="${fmt(y + oy)}" width="${fmt(cardW)}" height="${fmt(cardH)}" rx="${fmt(radius)}" ry="${fmt(radius)}" fill="none" stroke="#c0392b" stroke-width="0.1"/>`
     ).join('\n');
 
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${fmt(guideW)}mm" height="${fmt(guideH)}mm" viewBox="0 0 ${fmt(guideW)} ${fmt(guideH)}">
+    return `<svg xmlns="http://www.w3.org/2000/svg" ${PnP.svgSize(guideW, guideH)}>
   <rect x="0" y="0" width="${fmt(guideW)}" height="${fmt(guideH)}" fill="none" stroke="#2b6cb0" stroke-width="0.1"/>
 ${cardRects}
 </svg>`;
@@ -200,7 +200,7 @@ ${cardRects}
       cut += `  <rect x="${fmt(x0)}" y="${fmt(y0)}" width="${S}" height="${S}" fill="none" stroke="#c0392b" stroke-width="0.1"/>\n`;
     });
     const note = `<text x="${fmt(guideW / 2)}" y="${fmt(guideH - 6)}" font-family="sans-serif" font-size="3" text-anchor="middle" fill="#000">PnPCut registration test — ticks every 0.5 mm, long ticks every 1 mm, thick tick = no offset</text>`;
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${fmt(guideW)}mm" height="${fmt(guideH)}mm" viewBox="0 0 ${fmt(guideW)} ${fmt(guideH)}">
+    return `<svg xmlns="http://www.w3.org/2000/svg" ${PnP.svgSize(guideW, guideH)}>
   <rect x="0" y="0" width="${fmt(guideW)}" height="${fmt(guideH)}" fill="none" stroke="#2b6cb0" stroke-width="0.1"/>
   <g id="print">
 ${print}  ${note}

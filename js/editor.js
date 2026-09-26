@@ -353,7 +353,7 @@
         return `<path d="${PathGeom.toD(path, fmt)}" fill="none" stroke="${colors[s.layer]}" stroke-width="0.15"/>`;
       })
       .join('\n');
-    return `<svg xmlns="${SVG_NS}" width="${fmt(w)}mm" height="${fmt(h)}mm" viewBox="0 0 ${fmt(w)} ${fmt(h)}">\n${content}\n</svg>`;
+    return `<svg xmlns="${SVG_NS}" ${PnP.svgSize(w, h)}>\n${content}\n</svg>`;
   }
 
   function downloadSVG(layers, suffix) {
