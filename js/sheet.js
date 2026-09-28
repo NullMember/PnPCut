@@ -466,7 +466,8 @@
   async function exportLayers(layers, suffix) {
     const layout = computeLayout();
     const mirror = els.mirrorSheet.checked;
-    const base = `sheet_${round(layout.cardW)}x${round(layout.cardH)}mm_${layout.cols}x${layout.rows}`;
+    // Named after the card project when there is one, otherwise after the project.
+    const base = PnP.outputName(Object.keys(state.projects), `sheet_${round(layout.cardW)}x${round(layout.cardH)}mm_${layout.cols}x${layout.rows}`);
     const svgBlob = (markup) => new Blob([markup], { type: 'image/svg+xml' });
     if (state.pages.length === 1 || els.exportPages.value === 'current') {
       const pageSuffix = state.pages.length === 1 ? '' : `_p${state.current + 1}`;

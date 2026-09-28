@@ -120,19 +120,8 @@ ${cardRects}
   function downloadSVG() {
     const svgMarkup = els.downloadBtn.dataset.svg;
     if (!svgMarkup) return;
-    const blob = new Blob([svgMarkup], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    const cardW = num(els.cardW);
-    const cardH = num(els.cardH);
-    const cols = num(els.cols);
-    const rows = num(els.rowsInput);
-    a.href = url;
-    a.download = `card-grid_${cardW}x${cardH}mm_${cols}x${rows}.svg`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    const name = `card-grid_${num(els.cardW)}x${num(els.cardH)}mm_${num(els.cols)}x${num(els.rowsInput)}.svg`;
+    PnP.downloadBlob(new Blob([svgMarkup], { type: 'image/svg+xml' }), PnP.outputName([], name));
   }
 
   els.paperPreset.addEventListener('change', () => {

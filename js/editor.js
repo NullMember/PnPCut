@@ -376,7 +376,7 @@
       used.add(name);
       return { name: `${name}_${w}x${h}mm_all.svg`, data: cardSvg(cardShapes(i), LAYER_IDS, $('mirrorExport').checked) };
     });
-    PnP.downloadBlob(await PnP.zip.create(entries), `cards_${w}x${h}mm.zip`);
+    PnP.downloadBlob(await PnP.zip.create(entries), PnP.outputName([], `${w}x${h}mm.zip`, `cards_${w}x${h}mm.zip`));
   });
 
   // ---------- card project (.json, also read by the sheet assembler) ----------
@@ -407,7 +407,7 @@
 
   $('saveProjectBtn').addEventListener('click', () => {
     const project = projectData();
-    PnP.downloadBlob(new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' }), `card-project_${project.cardW}x${project.cardH}mm.json`, { record: false });
+    PnP.downloadBlob(new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' }), PnP.outputName([], `${project.cardW}x${project.cardH}mm.json`, `card-project_${project.cardW}x${project.cardH}mm.json`), { record: false });
     savedSignature = workSignature();
   });
 
@@ -436,7 +436,7 @@
     const win = window.open('', '_blank'); // synchronously, so popup blockers allow it
     try {
       const project = projectData();
-      const name = `card-project_${project.cardW}x${project.cardH}mm.json`;
+      const name = PnP.outputName([], `${project.cardW}x${project.cardH}mm.json`, `card-project_${project.cardW}x${project.cardH}mm.json`);
       const blob = new Blob([JSON.stringify(project)], { type: 'application/json' });
       const id = await PnP.handoff.save({ name: `${cards.length} card(s) from the card editor`, from: 'Card editor', items: [{ name, blob }] });
       const url = `sheet.html?import=${encodeURIComponent(id)}`;
