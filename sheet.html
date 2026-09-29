@@ -17,7 +17,7 @@
 
   <header>
     <h1>Sheet Assembler</h1>
-    <p class="subtitle">Combine cards from card editor projects into full-sheet SVGs, one per page, aligned to the grid tool's cell positions.</p>
+    <p class="subtitle">Put card editor designs on full sheets, one SVG per page.</p>
     <nav class="tool-nav">
       <a class="nav-link" href="index.html">&larr; Grid tool</a>
       <a class="nav-link" href="editor.html">&larr; Card editor</a>
@@ -29,7 +29,7 @@
     <div class="sidebar">
 
       <div class="panel">
-        <div class="panel-title">Card <span class="help" tabindex="0" data-tip="Use the same card size as your card projects. A project of a different size is marked ⚠ in the list and its lines are scaled to this size.">?</span></div>
+        <div class="panel-title">Card <span class="help" tabindex="0" data-tip="Use your projects' card size. Projects of another size are marked ⚠ and scaled.">?</span></div>
         <div class="control-group">
           <label for="cardPreset">Preset</label>
           <select id="cardPreset"></select>
@@ -47,7 +47,7 @@
       </div>
 
       <div class="panel">
-        <div class="panel-title">Outline Cut <span class="help" tabindex="0" data-tip="The cut around each card. Cut lines drawn in a card project (its Cut layer) are always included; they can stand in for the rectangle, for die-cut shapes like tokens or standees.">?</span></div>
+        <div class="panel-title">Outline Cut <span class="help" tabindex="0" data-tip="The cut around each card. A card's own cut lines are always included.">?</span></div>
         <div class="control-group">
           <label for="outlineMode">Cut around each card</label>
           <select id="outlineMode">
@@ -63,7 +63,7 @@
       </div>
 
       <div class="panel">
-        <div class="panel-title">Bleed &amp; Spacing <span class="help" tabindex="0" data-tip="Use the same values as in the grid tool, so the cut lines land on the printed cards. Gap and edge margin default to 2× and 1× the bleed amount; edit them once and they stop auto-updating.">?</span></div>
+        <div class="panel-title">Bleed &amp; Spacing <span class="help" tabindex="0" data-tip="Use the grid tool's values. Gap and edge margin follow the bleed until you change them.">?</span></div>
         <div class="control-group">
           <label for="bleed">Bleed per card (mm)</label>
           <input type="number" id="bleed" data-unit="mm" value="2" min="0" step="0.1" required>
@@ -104,7 +104,7 @@
       </div>
 
       <div class="panel">
-        <div class="panel-title">Cutting Machine <span class="help" tabindex="0" data-tip="The strip around the mat your machine can't cut into. Cricut's is 0.25&Prime; (6.35 mm); pick Custom and type your machine's value otherwise. The SVG is sized to the paper minus this margin and outlined by a guide rectangle for lining the cut up with the print.">?</span></div>
+        <div class="panel-title">Cutting Machine <span class="help" tabindex="0" data-tip="The mat edge your machine can't cut (Cricut: 6.35 mm).">?</span></div>
         <div class="control-group">
           <label for="machinePreset">Machine</label>
           <select id="machinePreset"></select>
@@ -116,7 +116,7 @@
       </div>
 
       <div class="panel">
-        <div class="panel-title">Grid <span class="help" tabindex="0" data-tip="How many cards go across and down. With Auto-fit on, it’s the most that fit inside the guide area at this card size, gap and edge gap; turn it off to set columns and rows yourself (a warning shows if they don’t fit).">?</span></div>
+        <div class="panel-title">Grid <span class="help" tabindex="0" data-tip="Auto-fit fits as many as possible. Turn it off to set columns and rows.">?</span></div>
         <div class="control-group">
           <label class="inline"><input type="checkbox" id="autoFit" checked> Auto-fit maximum grid</label>
         </div>
@@ -133,7 +133,7 @@
       </div>
 
       <div class="panel">
-        <div class="panel-title">Cut Registration <span class="help" tabindex="0" data-tip="If your machine cuts slightly off the print, move all cut, score and emboss lines by this amount (+ is right / down). Measure it with the registration test sheet.">?</span></div>
+        <div class="panel-title">Cut Registration <span class="help" tabindex="0" data-tip="If cuts land off the print, shift them by this much (+ is right / down). Measure with the test sheet.">?</span></div>
         <div class="row">
           <div class="control-group">
             <label for="cutOffsetX">Move cuts X (mm)</label>
@@ -155,7 +155,7 @@
 
     <div class="gallery-sidebar">
       <div class="panel">
-        <div class="panel-title">Card Projects <span class="help" tabindex="0" data-tip="Add the .json project files you saved from the card editor, then assign a card to each grid cell below.">?</span></div>
+        <div class="panel-title">Card Projects <span class="help" tabindex="0" data-tip="Add projects saved from the card editor, then pick a card for each cell.">?</span></div>
         <div class="dropzone dropzone-compact" id="projectDrop">
           <div class="dz-title">Drop card projects (.json) here</div>
           <div>or click to browse</div>
@@ -177,11 +177,11 @@
           <button type="button" id="deletePageBtn" class="btn-secondary btn-small">Delete</button>
         </div>
         <button type="button" id="placeAllBtn" class="btn-secondary btn-small" hidden>Place every card once</button>
-        <div class="input-hint" id="placeAllHint" hidden>Fills the next empty cells with each card no page uses yet, adding pages as needed.</div>
+        <div class="input-hint" id="placeAllHint" hidden>Places every unused card, adding pages as needed.</div>
       </div>
 
       <div class="panel">
-        <div class="panel-title">Cell Assignment <span class="help" tabindex="0" data-tip="Cells are numbered row, column: Cell 1,1 is the top-left card. Pick a card for each cell on this page; empty cells get just the outline cut, if one is on.">?</span></div>
+        <div class="panel-title">Cell Assignment <span class="help" tabindex="0" data-tip="Cell 1,1 is top left. Empty cells get only the outline cut.">?</span></div>
         <div id="cellAssignment" class="cell-assignment"></div>
         <div class="fill-all-row" id="fillAllRow" hidden>
           <select id="fillAllSelect"></select>

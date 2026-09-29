@@ -17,7 +17,7 @@
 
   <header>
     <h1>Print &amp; Cut Card Grid Generator</h1>
-    <p class="subtitle">Generates an SVG of your card cutting grid, framed by a paper guide sized to your cutting machine's mat dead margin.</p>
+    <p class="subtitle">A cut file for a card grid printed elsewhere, like a publisher's PnP sheet.</p>
     <nav class="tool-nav">
       <a class="nav-link current" href="index.html">Grid tool</a>
       <a class="nav-link" href="editor.html">Card editor &rarr;</a>
@@ -52,7 +52,7 @@
         </div>
 
         <div class="panel">
-          <div class="panel-title">Bleed &amp; Spacing <span class="help" tabindex="0" data-tip="Gap and edge margin default to 2× and 1× the bleed amount — edit them once and they'll stop auto-updating.">?</span></div>
+          <div class="panel-title">Bleed &amp; Spacing <span class="help" tabindex="0" data-tip="Gap and edge margin follow the bleed until you change them.">?</span></div>
           <div class="control-group">
             <label for="bleed">Bleed per card (mm)</label>
             <input type="number" id="bleed" data-unit="mm" value="2" min="0" step="0.1" required>
@@ -93,7 +93,7 @@
         </div>
 
         <div class="panel">
-          <div class="panel-title">Cutting Machine <span class="help" tabindex="0" data-tip="The strip around the mat your machine can't cut into. Cricut's is 0.25&Prime; (6.35 mm); pick Custom and type your machine's value otherwise. The SVG is sized to the paper minus this margin and outlined by a guide rectangle for lining the cut up with the print.">?</span></div>
+          <div class="panel-title">Cutting Machine <span class="help" tabindex="0" data-tip="The mat edge your machine can't cut (Cricut: 6.35 mm).">?</span></div>
           <div class="control-group">
             <label for="machinePreset">Machine</label>
             <select id="machinePreset"></select>
@@ -105,7 +105,7 @@
         </div>
 
         <div class="panel">
-          <div class="panel-title">Grid <span class="help" tabindex="0" data-tip="How many cards go across and down. With Auto-fit on, it’s the most that fit inside the guide area at this card size, gap and edge gap; turn it off to set columns and rows yourself (a warning shows if they don’t fit).">?</span></div>
+          <div class="panel-title">Grid <span class="help" tabindex="0" data-tip="Auto-fit fits as many as possible. Turn it off to set columns and rows.">?</span></div>
           <div class="control-group">
             <label class="inline"><input type="checkbox" id="autoFit" checked> Auto-fit maximum grid</label>
           </div>
@@ -122,7 +122,7 @@
         </div>
 
         <div class="panel">
-          <div class="panel-title">Cut Registration <span class="help" tabindex="0" data-tip="If your machine cuts slightly off the print, move all cut, score and emboss lines by this amount (+ is right / down). Measure it with the registration test sheet.">?</span></div>
+          <div class="panel-title">Cut Registration <span class="help" tabindex="0" data-tip="If cuts land off the print, shift them by this much (+ is right / down). Measure with the test sheet.">?</span></div>
           <div class="row">
             <div class="control-group">
               <label for="cutOffsetX">Move cuts X (mm)</label>
@@ -134,7 +134,7 @@
             </div>
           </div>
           <button type="button" id="registrationTestBtn" class="btn-secondary btn-small">Download registration test sheet</button>
-          <div class="input-hint">Print &amp; cut the test sheet (black = print, red = cut). Read where each cut edge lands on the tick scales: if cuts land 0.5 mm right of the printed squares, enter −0.5 for X.</div>
+          <div class="input-hint">Print and cut the test sheet. If cuts land 0.5 mm right of the squares, enter −0.5 for X.</div>
         </div>
 
         <div id="warning" class="status error" hidden></div>

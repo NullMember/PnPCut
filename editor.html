@@ -18,7 +18,7 @@
 
   <header>
     <h1>Card Line Art Editor</h1>
-    <p class="subtitle">Draw cut / score-fold / emboss line art on top of a card image and export precise per-layer SVGs.</p>
+    <p class="subtitle">Draw cut, score and emboss lines on a card and export them as SVG.</p>
     <nav class="tool-nav">
       <a class="nav-link" href="index.html">&larr; Grid tool</a>
       <a class="nav-link current" href="editor.html">Card editor</a>
@@ -30,7 +30,7 @@
     <div class="sidebar">
 
       <div class="panel">
-        <div class="panel-title">Cards <span class="help" tabindex="0" data-tip="A project holds any number of cards of the same size, each with its own reference image and line art. The sheet assembler can place every card from the project. On each card: the eye shows or hides its reference image (never exported; stretched over the card, transparent pixels as a checkerboard), the picture button sets or replaces it, or drop an image on the card.">?</span></div>
+        <div class="panel-title">Cards <span class="help" tabindex="0" data-tip="Cards in a project share one size. The eye shows or hides a card's reference image, which is never exported. Drop an image on a card to set it.">?</span></div>
         <div class="dropzone dropzone-compact" id="cardImageDrop">
           <div class="dz-title">Drop card images here</div>
           <div>each image becomes a card &middot; or click to browse</div>
@@ -69,7 +69,7 @@
 
       <div class="panel">
         <div class="panel-title">Canvas</div>
-        <div class="input-hint">Tools: V select, A nodes, L line, R rect, E ellipse, P pen, F freehand, T trace; Esc returns to Select &middot; drawing tools stay active &middot; G grid, S snapping, Ctrl/Cmd while dragging bypasses snapping &middot; drag from a ruler to add a guide, drag it back to remove &middot; scroll to pan, Ctrl/Cmd+scroll to zoom, Space-drag to pan.</div>
+        <div class="input-hint">V select &middot; A nodes &middot; L line &middot; R rect &middot; E ellipse &middot; P pen &middot; F freehand &middot; T trace &middot; G grid &middot; S snap &middot; drag from a ruler for a guide &middot; Ctrl/Cmd+scroll to zoom, Space-drag to pan.</div>
         <div id="editorOptions" class="editor-options"></div>
       </div>
 
@@ -89,11 +89,11 @@
           <button type="button" id="addTemplateBtn" class="btn-secondary btn-small">Add to this card</button>
           <button type="button" id="addTemplateAllBtn" class="btn-secondary btn-small">Add to every card</button>
         </div>
-        <div class="input-hint">Cut lines are saved with the card, so the sheet assembler can use them as the card's outline instead of its rounded rectangle.</div>
+        <div class="input-hint">The sheet assembler uses a card's cut lines as its outline.</div>
       </div>
 
       <div class="panel">
-        <div class="panel-title">Project <span class="help" tabindex="0" data-tip="Save project (.json) writes every card, and is what the sheet assembler reads. The top bar’s Save writes a .pnp project of this tool (cards and settings). Both open here again. Open in sheet assembler sends every card to a new sheet assembler tab and places each card once.">?</span></div>
+        <div class="panel-title">Project <span class="help" tabindex="0" data-tip="Save project (.json) is what the sheet assembler opens. Open in sheet assembler sends every card there.">?</span></div>
         <div class="button-group">
           <button type="button" id="saveProjectBtn" class="btn-secondary">Save project (.json)</button>
           <button type="button" id="openSheetBtn" class="btn-primary">Open in sheet assembler</button>
@@ -117,7 +117,6 @@
           <button type="button" id="exportEmbossBtn" class="btn-secondary">Export Emboss only</button>
           <button type="button" id="exportCardsBtn" class="btn-secondary">Export every card (.zip)</button>
         </div>
-        <div class="input-hint">The layer buttons export the card you are editing.</div>
       </div>
     </div>
 
